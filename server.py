@@ -53,32 +53,73 @@ PRESETS = [
     }
 ]
 
-DB_FILE = "rules_db.json"
+DB_FILE = os.path.expanduser("~/.baoyu-skills/rules_db.json")
 
 def load_rules_db():
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                if "current_rules" in data:
+                    db = {
+                        "active_business_id": "biz_default",
+                        "businesses": {
+                            "biz_default": {
+                                "id": "biz_default",
+                                "name": "业务1",
+                                "is_default": True,
+                                "created_at": timestamp,
+                                "updated_at": timestamp,
+                                "rules": data["current_rules"]
+                            }
+                        }
+                    }
+                    save_rules_db(db)
+                    return db
+                return data
         except Exception:
             pass
     db = {
-        "current_rules": list(PRESETS),
-        "versions": [
-            {
-                "version_id": "v_initial",
-                "timestamp": "2026-06-11 12:00:00",
-                "description": "系统初始规则版本",
+        "active_business_id": "biz_default",
+        "businesses": {
+            "biz_default": {
+                "id": "biz_default",
+                "name": "业务1",
+                "is_default": True,
+                "created_at": timestamp,
+                "updated_at": timestamp,
                 "rules": list(PRESETS)
             }
-        ]
+        }
     }
     save_rules_db(db)
     return db
 
 def save_rules_db(db):
     try:
+        os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
         with open(DB_FILE, 'w', encoding='utf-8') as f:
+            json.dump(db, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+HISTORY_FILE = os.path.expanduser("~/.baoyu-skills/history_db.json")
+
+def load_history_db():
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+def save_history_db(db):
+    try:
+        os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
+        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
             json.dump(db, f, ensure_ascii=False, indent=2)
         return True
     except Exception:
@@ -237,6 +278,13 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(db).encode('utf-8'))
             return
+        elif self.path == '/api/get_history':
+            history = load_history_db()
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(history).encode('utf-8'))
+            return
         return super().do_GET()
 
     def do_POST(self):
@@ -261,63 +309,134 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             data = json.loads(post_data.decode('utf-8'))
             
             db = load_rules_db()
-            db["current_rules"] = data.get("current_rules", [])
-            save_rules_db(db)
+            active_id = db.get("active_business_id", "biz_default")
             
+            if active_id in db["businesses"]:
+                db["businesses"][active_id]["rules"] = data.get("current_rules", [])
+                db["businesses"][active_id]["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                save_rules_db(db)
+                
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({"success": True}).encode('utf-8'))
             return
-        elif self.path == '/api/save_rule_version':
+        elif self.path == '/api/create_business':
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode('utf-8'))
-            desc = data.get("description", "新规则版本")
+            name = data.get("name", "未命名业务").strip()
             
             db = load_rules_db()
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            version_id = "v_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            biz_id = "biz_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             
-            new_version = {
-                "version_id": version_id,
-                "timestamp": timestamp,
-                "description": desc,
-                "rules": list(db["current_rules"])
+            db["businesses"][biz_id] = {
+                "id": biz_id,
+                "name": name,
+                "is_default": False,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+                "rules": list(PRESETS)
             }
-            db["versions"].append(new_version)
+            db["active_business_id"] = biz_id
             save_rules_db(db)
             
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(json.dumps({"success": True, "version": new_version}).encode('utf-8'))
+            self.wfile.write(json.dumps({"success": True, "active_business_id": biz_id}).encode('utf-8'))
             return
-        elif self.path == '/api/load_rule_version':
+        elif self.path == '/api/delete_business':
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode('utf-8'))
-            version_id = data.get("version_id")
+            biz_id = data.get("business_id")
             
             db = load_rules_db()
-            found = False
-            for v in db["versions"]:
-                if v["version_id"] == version_id:
-                    db["current_rules"] = list(v["rules"])
-                    found = True
-                    break
-                    
-            if found:
+            is_default = db["businesses"].get(biz_id, {}).get("is_default", False)
+            if len(db["businesses"]) <= 1 or is_default:
+                self.send_response(400)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": "默认集或最后一个业务集禁止删除"}).encode('utf-8'))
+                return
+                
+            if biz_id in db["businesses"]:
+                del db["businesses"][biz_id]
+                if db["active_business_id"] == biz_id:
+                    db["active_business_id"] = list(db["businesses"].keys())[0]
                 save_rules_db(db)
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps({"success": True}).encode('utf-8'))
-            else:
-                self.send_response(404)
-                self.send_header('Content-type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps({"success": False, "error": "Version not found"}).encode('utf-8'))
+                
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "active_business_id": db["active_business_id"]}).encode('utf-8'))
+            return
+        elif self.path == '/api/rename_business':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+            biz_id = data.get("business_id")
+            new_name = data.get("name", "未命名业务").strip()
+            
+            db = load_rules_db()
+            if biz_id in db["businesses"] and new_name:
+                db["businesses"][biz_id]["name"] = new_name
+                db["businesses"][biz_id]["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                save_rules_db(db)
+                
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True}).encode('utf-8'))
+            return
+        elif self.path == '/api/switch_business':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+            biz_id = data.get("business_id")
+            
+            db = load_rules_db()
+            if biz_id in db["businesses"]:
+                db["active_business_id"] = biz_id
+                save_rules_db(db)
+                
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True}).encode('utf-8'))
+            return
+        elif self.path == '/api/set_default_business':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+            biz_id = data.get("business_id")
+            
+            db = load_rules_db()
+            if biz_id in db["businesses"]:
+                for bid in db["businesses"]:
+                    db["businesses"][bid]["is_default"] = (bid == biz_id)
+                save_rules_db(db)
+                
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True}).encode('utf-8'))
+            return
+        elif self.path == '/api/reset_business_rules':
+            db = load_rules_db()
+            active_id = db.get("active_business_id", "biz_default")
+            
+            if active_id in db["businesses"]:
+                db["businesses"][active_id]["rules"] = list(PRESETS)
+                db["businesses"][active_id]["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                save_rules_db(db)
+                
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True}).encode('utf-8'))
             return
         elif self.path == '/api/import_rules':
             content_length = int(self.headers['Content-Length'])
@@ -345,7 +464,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 }]
                 
             db = load_rules_db()
-            current_rules = db["current_rules"]
+            active_id = db.get("active_business_id", "biz_default")
+            current_rules = db["businesses"].get(active_id, {}).get("rules", [])
             
             api_key = self.load_key("GEMINI_API_KEY")
             
@@ -368,32 +488,55 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             resolutions = data.get("resolutions", [])
             
             db = load_rules_db()
-            current_rules = db["current_rules"]
+            active_id = db.get("active_business_id", "biz_default")
             
-            for item in resolutions:
-                rule = item.get("rule")
-                action = item.get("action")
+            if active_id in db["businesses"]:
+                current_rules = db["businesses"][active_id]["rules"]
                 
-                if not rule:
-                    continue
+                for item in resolutions:
+                    rule = item.get("rule")
+                    action = item.get("action")
                     
-                if action == "ignore":
-                    continue
-                elif action == "overwrite":
-                    conflict_info = rule.get("conflict_or_duplicate")
-                    if conflict_info:
-                        exist_id = conflict_info.get("existing_id")
-                        current_rules = [r for r in current_rules if r.get("id") != exist_id]
-                    if "conflict_or_duplicate" in rule:
-                        del rule["conflict_or_duplicate"]
-                    current_rules.append(rule)
-                else:
-                    if "conflict_or_duplicate" in rule:
-                        del rule["conflict_or_duplicate"]
-                    current_rules.append(rule)
-                    
-            db["current_rules"] = current_rules
-            save_rules_db(db)
+                    if not rule:
+                        continue
+                        
+                    if action == "ignore":
+                        continue
+                    elif action == "overwrite":
+                        conflict_info = rule.get("conflict_or_duplicate")
+                        if conflict_info:
+                            exist_id = conflict_info.get("existing_id")
+                            current_rules = [r for r in current_rules if r.get("id") != exist_id]
+                        if "conflict_or_duplicate" in rule:
+                            del rule["conflict_or_duplicate"]
+                        current_rules.append(rule)
+                    else:
+                        if "conflict_or_duplicate" in rule:
+                            del rule["conflict_or_duplicate"]
+                        current_rules.append(rule)
+                        
+                db["businesses"][active_id]["rules"] = current_rules
+                db["businesses"][active_id]["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                save_rules_db(db)
+                
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True}).encode('utf-8'))
+            return
+        elif self.path == '/api/save_history':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            record = json.loads(post_data.decode('utf-8'))
+            
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            record["timestamp"] = timestamp
+            record["id"] = "hist_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            db = load_history_db()
+            db.insert(0, record)
+            db = db[:50]
+            save_history_db(db)
             
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -466,14 +609,15 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
 class ReuseAddrTCPServer(socketserver.TCPServer):
     allow_reuse_address = True
 
-print("BidShield UI server starting at http://localhost:8000...")
-webbrowser.open("http://localhost:8000")
+if __name__ == "__main__":
+    print("BidShield UI server starting at http://localhost:8000...")
+    webbrowser.open("http://localhost:8000")
 
-# Change working directory to the script's directory so it serves the files correctly
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    # Change working directory to the script's directory so it serves the files correctly
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-with ReuseAddrTCPServer(("", PORT), CustomHandler) as httpd:
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        print("\nServer stopped.")
+    with ReuseAddrTCPServer(("", PORT), CustomHandler) as httpd:
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\nServer stopped.")

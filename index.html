@@ -88,6 +88,42 @@
             font-weight: 600;
         }
 
+        .header-tabs {
+            display: flex;
+            background-color: var(--bg-body);
+            padding: 4px;
+            border-radius: 8px;
+            gap: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        .tab-item {
+            background: transparent;
+            border: none;
+            outline: none;
+            padding: 6px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tab-item:hover {
+            color: var(--text-main);
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+
+        .tab-item.active {
+            background-color: #FFFFFF;
+            color: var(--primary);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
         .nav-actions {
             display: flex;
             gap: 12px;
@@ -1290,6 +1326,74 @@
             font-size: 13px;
             padding: 10px 12px;
         }
+
+        /* History Popover */
+        .history-popover {
+            position: absolute;
+            top: 70px;
+            right: 24px;
+            width: 380px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: none;
+            padding: 16px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .history-popover-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+            font-weight: bold;
+            font-size: 14px;
+            color: var(--text-main);
+        }
+
+        .history-item {
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 12px;
+            border-bottom: 1px dashed var(--border-color);
+            background: rgba(255, 255, 255, 0.5);
+            margin-bottom: 8px;
+            color: var(--text-main);
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .history-item:hover {
+            background-color: var(--primary-light);
+            color: var(--primary);
+        }
+
+        .history-item-meta {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-muted);
+            font-size: 10px;
+            margin-bottom: 6px;
+        }
+
+        .history-item-title {
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -1303,43 +1407,31 @@
                 <span class="logo-badge">BidShield</span>
             </div>
         </div>
+        <div class="header-tabs">
+            <button class="tab-item active" id="mode-file-btn" onclick="switchMode('file')">📁 文件自查</button>
+            <button class="tab-item" id="mode-text-btn" onclick="switchMode('text')">📝 文本自查</button>
+            <button class="tab-item" id="mode-rule-btn" onclick="switchMode('rule')">🛡️ 规则管理</button>
+        </div>
         <div class="nav-actions">
-            <button class="btn-nav">🕒 历史自查库 (0)</button>
+            <button class="btn-nav" id="history-btn" onclick="toggleHistoryPopover(event)">🕒 历史自查库 (<span id="history-count">0</span>)</button>
             <button class="btn-nav" onclick="openApiKeyModal()">🔑 配置 API 密钥</button>
         </div>
     </header>
 
+    <!-- History Popover Container -->
+    <div id="history-popover" class="history-popover">
+        <div class="history-popover-header">
+            <span>🕒 历史自查比对记录</span>
+            <span style="cursor: pointer; font-size: 18px;" onclick="toggleHistoryPopover()">×</span>
+        </div>
+        <div id="history-list-area">
+            <!-- Dynamic history items -->
+        </div>
+    </div>
+
     <!-- Step 1: Config Area -->
     <div class="config-card">
         <div class="config-container">
-            <!-- Left Sidebar for Mode Selection -->
-            <div class="mode-sidebar">
-                <div class="sidebar-title">⚙️ 自查模式选择</div>
-                <div class="mode-nav">
-                    <div class="mode-nav-item active" id="mode-file-btn" onclick="switchMode('file')">
-                        <span class="mode-icon">📁</span>
-                        <div class="mode-details">
-                            <span class="mode-name">文件上传比对</span>
-                            <span class="mode-desc">支持 PDF/Docx 文件</span>
-                        </div>
-                    </div>
-                    <div class="mode-nav-item" id="mode-text-btn" onclick="switchMode('text')">
-                        <span class="mode-icon">📝</span>
-                        <div class="mode-details">
-                            <span class="mode-name">复制文本比对</span>
-                            <span class="mode-desc">直接粘贴文本比对</span>
-                        </div>
-                    </div>
-                    <div class="mode-nav-item" id="mode-rule-btn" onclick="switchMode('rule')">
-                        <span class="mode-icon">🛡️</span>
-                        <div class="mode-details">
-                            <span class="mode-name">审查规则管理</span>
-                            <span class="mode-desc">内置/修改/版本/导入</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Right Content Area -->
             <div class="config-content">
                 <!-- File Upload Mode View -->
@@ -1479,8 +1571,11 @@
                                 </div>
                                 <input type="file" id="rule-file-input" style="display: none;" onchange="handleRuleFileSelect(event)" accept=".pdf,.docx,.md,.txt">
                             </div>
-                            <div class="action-row" style="margin-top: 10px; justify-content: flex-start; padding: 0;">
+                            <div class="action-row" style="margin-top: 10px; justify-content: flex-start; padding: 0; flex-wrap: wrap; gap: 10px; align-items: center;">
                                 <button class="btn-submit-check" onclick="submitNewRule()" style="margin: 0; padding: 10px 20px; font-size: 13px;">解析并导入规则</button>
+                                <span style="font-size: 11px; color: var(--text-muted);">
+                                    💡 <strong>小贴士</strong>：配置 API Key 后可启用大模型语义提取与高精度冲突判定，未配置时将使用本地匹配算法。
+                                </span>
                             </div>
                         </div>
 
@@ -1488,7 +1583,6 @@
                         <div class="upload-column">
                             <div class="rules-card-inner" style="height: 100%; min-height: 290px; box-sizing: border-box;">
                                 <div class="rules-card-title">
-                                    <span>🔍 规则导入冲突与重复检测</span>
                                     <span id="conflict-count-badge" class="rule-badge rule-badge-sys" style="display:none;">待处理</span>
                                 </div>
                                 <div id="conflict-log-area" class="conflict-container-box">
@@ -1504,22 +1598,35 @@
                         </div>
                     </div>
 
-                    <!-- Bottom Section: Active Rules List and Versions Split -->
-                    <div class="rules-grid-split">
-                        <!-- Left: Rules list -->
+                    <!-- Bottom Section: Active Rules List -->
+                    <div style="margin-top: 20px;">
                         <div class="rules-card-inner">
-                            <div class="rules-card-title">
+                            <div class="rules-card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 8px;">
                                 <span>📋 现有自查规则列表</span>
-                                <button class="btn-nav" onclick="saveRulesToServer()" style="font-size: 12px; padding: 4px 10px; margin: 0;">💾 保存当前配置</button>
+                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    <span style="font-size: 12px; color: var(--text-muted);">业务集:</span>
+                                    <select id="business-select" class="input-text" style="width: 130px; padding: 4px 8px; font-size: 12px; background-color: white;" onchange="switchBusiness(this.value)">
+                                        <!-- Dynamic options -->
+                                    </select>
+                                    <button class="btn-nav" onclick="createBusinessPrompt()" style="font-size: 11px; padding: 4px 8px; margin: 0;">新建</button>
+                                    <button class="btn-nav" onclick="renameBusinessPrompt()" style="font-size: 11px; padding: 4px 8px; margin: 0;">修改名称</button>
+                                    <button class="btn-nav btn-nav-primary" id="btn-set-default-biz" onclick="setDefaultBusiness()" style="font-size: 11px; padding: 4px 8px; margin: 0;">设为默认</button>
+                                    <button class="btn-nav" id="btn-reset-rules" onclick="resetBusinessRules()" style="font-size: 11px; padding: 4px 8px; margin: 0; color: var(--risk-medium); border-color: #FDE047;">一键复位</button>
+                                    <button class="btn-nav" id="btn-delete-biz" onclick="deleteBusiness()" style="font-size: 11px; padding: 4px 8px; margin: 0; color: var(--risk-high); border-color: #FECACA;">删除</button>
+                                    <button class="btn-nav" onclick="saveRulesToServer()" style="font-size: 11px; padding: 4px 10px; margin: 0; font-weight: bold; border-color: var(--primary); color: var(--primary);">💾 保存配置</button>
+                                </div>
                             </div>
-                            <div class="issues-table-container" style="max-height: 350px; overflow-y: auto;">
+                            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px; display: flex; gap: 15px;" id="business-meta-info-inline">
+                                <!-- Inline meta description -->
+                            </div>
+                            <div class="issues-table-container" style="max-height: 400px; overflow-y: auto;">
                                 <table class="issues-table rules-table">
                                     <thead>
                                         <tr>
                                             <th style="width: 50px;">开关</th>
-                                            <th style="width: 120px;">规则名称</th>
+                                            <th style="width: 150px;">规则名称</th>
                                             <th>规则描述</th>
-                                            <th style="width: 80px;">分类</th>
+                                            <th style="width: 100px;">分类</th>
                                             <th style="width: 100px;">操作</th>
                                         </tr>
                                     </thead>
@@ -1527,24 +1634,6 @@
                                         <!-- Dynamic rules rows -->
                                     </tbody>
                                 </table>
-                            </div>
-                        </div>
-
-                        <!-- Right: Versions -->
-                        <div class="rules-card-inner">
-                            <div class="rules-card-title">
-                                <span>🕒 规则版本管理与备份</span>
-                            </div>
-                            <div class="input-group">
-                                <label class="input-label" style="font-size: 12px;">创建规则版本快照</label>
-                                <div style="display: flex; gap: 8px;">
-                                    <input type="text" id="version-desc-input" class="input-text" style="padding: 8px 10px;" placeholder="输入版本备注(如: 2026合规新版)">
-                                    <button class="btn-submit-check" onclick="createRuleVersion()" style="margin:0; padding: 8px 14px; font-size:12px; white-space:nowrap; box-shadow:none;">备份版本</button>
-                                </div>
-                            </div>
-                            <div style="font-weight: 600; font-size: 12px; color: var(--text-main); margin-top: 5px;">版本历史记录：</div>
-                            <div class="timeline" id="rule-versions-timeline">
-                                <!-- Dynamic timeline -->
                             </div>
                         </div>
                     </div>
@@ -2009,6 +2098,7 @@
         window.onload = function() {
             switchMode('file');
             updateFileCounts();
+            loadHistoryFromServer();
         };
 
         function switchMode(mode) {
@@ -2021,9 +2111,9 @@
             const ruleView = document.getElementById("mode-rule-view");
             const titleEl = document.getElementById("config-section-title");
 
-            if (fileBtn) fileBtn.className = mode === 'file' ? "mode-nav-item active" : "mode-nav-item";
-            if (textBtn) textBtn.className = mode === 'text' ? "mode-nav-item active" : "mode-nav-item";
-            if (ruleBtn) ruleBtn.className = mode === 'rule' ? "mode-nav-item active" : "mode-nav-item";
+            if (fileBtn) fileBtn.className = mode === 'file' ? "tab-item active" : "tab-item";
+            if (textBtn) textBtn.className = mode === 'text' ? "tab-item active" : "tab-item";
+            if (ruleBtn) ruleBtn.className = mode === 'rule' ? "tab-item active" : "tab-item";
 
             if (mode === 'file') {
                 if (fileView) fileView.style.display = "block";
@@ -2152,12 +2242,39 @@
         }
 
         // Start analysis animation
-        function startSelfCheck() {
+        function startSelfCheck(isHistoryRecall = false) {
             const loading = document.getElementById("loading-area");
             const results = document.getElementById("results-area");
             
             results.style.display = "none";
             loading.style.display = "flex";
+
+            if (!isHistoryRecall) {
+                const record = {
+                    mode: currentMode
+                };
+                if (currentMode === 'file') {
+                    const priFiles = Array.from(document.querySelectorAll("#primary-file-list-container .file-item-name")).map(el => el.innerText);
+                    const secFiles = Array.from(document.querySelectorAll("#secondary-file-list-container .file-item-name")).map(el => el.innerText);
+                    record.primary_files = priFiles;
+                    record.secondary_files = secFiles;
+                } else {
+                    record.primary_company = getPrimaryCompany();
+                    record.secondary_company = getSecondaryCompany();
+                }
+                
+                fetch('/api/save_history', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(record)
+                })
+                .then(res => {
+                    if (res.ok) {
+                        loadHistoryFromServer();
+                    }
+                })
+                .catch(err => console.error("保存历史记录失败:", err));
+            }
             
             const statuses = currentMode === 'file' ? [
                 "正在加载文档解析引擎...",
@@ -2527,21 +2644,335 @@
             });
         }
 
+        // --- History Records Management JS Logic ---
+        let historyRecords = [];
+
+        function loadHistoryFromServer() {
+            fetch('/api/get_history')
+            .then(res => res.json())
+            .then(data => {
+                historyRecords = data || [];
+                const countBadge = document.getElementById("history-count");
+                if (countBadge) {
+                    countBadge.innerText = historyRecords.length;
+                }
+                renderHistoryList();
+            })
+            .catch(err => console.error("加载自查历史失败:", err));
+        }
+
+        function toggleHistoryPopover(event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            const popover = document.getElementById("history-popover");
+            if (!popover) return;
+            
+            if (popover.style.display === "block") {
+                popover.style.display = "none";
+            } else {
+                popover.style.display = "block";
+                loadHistoryFromServer();
+            }
+        }
+
+        // Close popover when clicking outside
+        document.addEventListener("click", function(event) {
+            const popover = document.getElementById("history-popover");
+            const btn = document.getElementById("history-btn");
+            if (popover && popover.style.display === "block") {
+                if (!popover.contains(event.target) && event.target !== btn && !btn.contains(event.target)) {
+                    popover.style.display = "none";
+                }
+            }
+        });
+
+        function renderHistoryList() {
+            const listArea = document.getElementById("history-list-area");
+            if (!listArea) return;
+            listArea.innerHTML = "";
+            
+            if (historyRecords.length === 0) {
+                listArea.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px 0; font-size: 12px;">无历史自查比对记录</div>`;
+                return;
+            }
+            
+            historyRecords.forEach((record, index) => {
+                const item = document.createElement("div");
+                item.className = "history-item";
+                item.onclick = () => {
+                    restoreHistoryRecord(record);
+                    toggleHistoryPopover();
+                };
+                
+                let titleText = "";
+                if (record.mode === 'file') {
+                    const priCount = record.primary_files ? record.primary_files.length : 0;
+                    const secCount = record.secondary_files ? record.secondary_files.length : 0;
+                    titleText = `📁 文件比对: 主标[${priCount}份] vs 对照[${secCount}份]`;
+                } else {
+                    titleText = `📝 文本比对: [${record.primary_company || "未命名"}] vs [${record.secondary_company || "未命名"}]`;
+                }
+                
+                item.innerHTML = `
+                    <div class="history-item-meta">
+                        <span>#${historyRecords.length - index}</span>
+                        <span>${record.timestamp || "未知时间"}</span>
+                    </div>
+                    <div class="history-item-title" title="${titleText}">${titleText}</div>
+                `;
+                listArea.appendChild(item);
+            });
+        }
+
+        function restoreHistoryRecord(record) {
+            currentMode = record.mode;
+            switchMode(record.mode);
+            
+            if (record.mode === 'file') {
+                const priContainer = document.getElementById("primary-file-list-container");
+                if (priContainer) {
+                    priContainer.innerHTML = "";
+                    record.primary_files.forEach((fname, i) => {
+                        const item = document.createElement("div");
+                        item.className = "file-item active";
+                        item.id = `hist-file-pri-${i}`;
+                        item.innerHTML = `
+                            <div class="file-item-left">
+                                <span class="file-item-icon">📄</span>
+                                <span class="file-item-name">${fname}</span>
+                            </div>
+                            <div class="file-item-right">
+                                <span class="file-item-size">27.59 MB</span>
+                                <span class="file-item-delete" onclick="deleteFile('primary', 'hist-file-pri-${i}', event)">🗑️</span>
+                            </div>
+                        `;
+                        priContainer.appendChild(item);
+                    });
+                }
+                
+                const secContainer = document.getElementById("secondary-file-list-container");
+                if (secContainer) {
+                    secContainer.innerHTML = "";
+                    record.secondary_files.forEach((fname, i) => {
+                        const rawName = fname.split('--')[0] || fname.split('_')[0] || "对比方";
+                        const cleanName = rawName.replace(/\.[^/.]+$/, "");
+                        
+                        const item = document.createElement("div");
+                        item.className = i === 0 ? "file-item active" : "file-item";
+                        item.id = `hist-file-sec-${i}`;
+                        item.onclick = (e) => {
+                            if (e.target.classList.contains('file-item-delete')) return;
+                            selectCompetitor(cleanName);
+                        };
+                        item.innerHTML = `
+                            <div class="file-item-left">
+                                <span class="file-item-icon">📄</span>
+                                <span class="file-item-name">${fname}</span>
+                            </div>
+                            <div class="file-item-right">
+                                <span class="file-item-size">21.54 KB</span>
+                                <span class="file-item-delete" onclick="deleteFile('secondary', 'hist-file-sec-${i}', event)">🗑️</span>
+                            </div>
+                        `;
+                        secContainer.appendChild(item);
+                    });
+                }
+                primaryFileCount = record.primary_files.length;
+                secondaryFileCount = record.secondary_files.length;
+                updateFileCounts();
+            } else {
+                const priComp = document.getElementById("primary-company");
+                const secComp = document.getElementById("secondary-company");
+                if (priComp) priComp.value = record.primary_company;
+                if (secComp) secComp.value = record.secondary_company;
+            }
+            
+            startSelfCheck(true);
+        }
+
         // --- Rules Management JS Logic ---
         let currentRules = [];
-        let ruleVersions = [];
+        let businesses = {};
+        let currentBusinessId = "";
         let pendingImportRules = [];
 
         function loadRulesFromServer() {
             fetch('/api/get_rules')
             .then(res => res.json())
             .then(data => {
-                currentRules = data.current_rules || [];
-                ruleVersions = data.versions || [];
+                businesses = data.businesses || {};
+                currentBusinessId = data.active_business_id || "";
+                if (currentBusinessId && businesses[currentBusinessId]) {
+                    currentRules = businesses[currentBusinessId].rules || [];
+                } else {
+                    currentRules = [];
+                }
+                renderBusinessSelect();
                 renderRulesList();
-                renderVersionsTimeline();
+                renderBusinessMeta();
             })
             .catch(err => console.error("加载审查规则失败:", err));
+        }
+
+        function renderBusinessSelect() {
+            const select = document.getElementById("business-select");
+            if (!select) return;
+            select.innerHTML = "";
+            
+            Object.keys(businesses).forEach(bizId => {
+                const biz = businesses[bizId];
+                const option = document.createElement("option");
+                option.value = bizId;
+                option.text = biz.name + (biz.is_default ? " [默认]" : "");
+                select.appendChild(option);
+            });
+            select.value = currentBusinessId;
+        }
+
+        function renderBusinessMeta() {
+            const metaArea = document.getElementById("business-meta-info-inline");
+            if (!metaArea) return;
+            
+            const biz = businesses[currentBusinessId];
+            if (!biz) {
+                metaArea.innerHTML = "";
+                return;
+            }
+            
+            metaArea.innerHTML = `
+                <span><strong>创建时间：</strong>${biz.created_at || "未知"}</span>
+                <span><strong>更新时间：</strong>${biz.updated_at || "未知"}</span>
+                <span><strong>规则数量：</strong>${biz.rules.length} 条</span>
+                <span><strong>默认加载：</strong>${biz.is_default ? '<span style="color:var(--risk-low); font-weight:bold;">是</span>' : '否'}</span>
+            `;
+        }
+
+        function switchBusiness(bizId) {
+            fetch('/api/switch_business', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ business_id: bizId })
+            })
+            .then(res => {
+                if (res.ok) {
+                    loadRulesFromServer();
+                }
+            })
+            .catch(err => console.error("切换业务规则集失败:", err));
+        }
+
+        function createBusinessPrompt() {
+            const name = prompt("请输入新建业务集名称：");
+            if (name === null) return;
+            const trimmedName = name.trim();
+            if (!trimmedName) {
+                alert("业务集名称不能为空！");
+                return;
+            }
+            
+            fetch('/api/create_business', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name: trimmedName })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert("新建业务集成功！");
+                    loadRulesFromServer();
+                } else {
+                    alert("创建业务集失败: " + (data.error || "未知原因"));
+                }
+            })
+            .catch(err => alert("创建业务集出错: " + err));
+        }
+
+        function renameBusinessPrompt() {
+            const biz = businesses[currentBusinessId];
+            if (!biz) return;
+            const name = prompt("请输入新的业务集名称：", biz.name);
+            if (name === null) return;
+            const trimmedName = name.trim();
+            if (!trimmedName) {
+                alert("业务集名称不能为空！");
+                return;
+            }
+            
+            fetch('/api/rename_business', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ business_id: currentBusinessId, name: trimmedName })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert("修改名称成功！");
+                    loadRulesFromServer();
+                } else {
+                    alert("修改名称失败: " + (data.error || "未知原因"));
+                }
+            })
+            .catch(err => alert("修改名称出错: " + err));
+        }
+
+        function deleteBusiness() {
+            const biz = businesses[currentBusinessId];
+            if (biz && biz.is_default) {
+                alert("默认业务集禁止删除！请先将其他集设为默认。");
+                return;
+            }
+            if (Object.keys(businesses).length <= 1) {
+                alert("这是最后一个业务集，禁止删除！");
+                return;
+            }
+            
+            if (confirm("确定要删除当前活动业务集【" + biz.name + "】吗？该操作不可恢复！")) {
+                fetch('/api/delete_business', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ business_id: currentBusinessId })
+                })
+                .then(res => {
+                    if (res.ok) {
+                        alert("业务集已删除。");
+                        loadRulesFromServer();
+                    } else {
+                        res.json().then(data => alert("删除失败: " + data.error));
+                    }
+                })
+                .catch(err => alert("删除业务集出错: " + err));
+            }
+        }
+
+        function setDefaultBusiness() {
+            fetch('/api/set_default_business', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ business_id: currentBusinessId })
+            })
+            .then(res => {
+                if (res.ok) {
+                    alert("已成功将当前业务集设为默认启动加载！");
+                    loadRulesFromServer();
+                }
+            })
+            .catch(err => alert("设为默认出错: " + err));
+        }
+
+        function resetBusinessRules() {
+            if (confirm("确定要将当前业务集的规则全部重置为系统默认规则吗？自定义修改将被覆盖。")) {
+                fetch('/api/reset_business_rules', {
+                    method: 'POST'
+                })
+                .then(res => {
+                    if (res.ok) {
+                        alert("规则集已重置为系统预置默认规则！");
+                        loadRulesFromServer();
+                    }
+                })
+                .catch(err => alert("重置规则失败: " + err));
+            }
         }
 
         function renderRulesList() {
@@ -2557,7 +2988,6 @@
             currentRules.forEach(r => {
                 const tr = document.createElement("tr");
                 const badgeClass = r.category === "系统预置" ? "rule-badge-sys" : "rule-badge-custom";
-                const isSystem = r.category === "系统预置";
                 
                 tr.innerHTML = `
                     <td style="text-align: center;">
@@ -2571,7 +3001,7 @@
                     <td><span class="rule-badge ${badgeClass}">${r.category}</span></td>
                     <td>
                         <button class="btn-nav" onclick="openRuleEditModal('${r.id}')" style="display: inline-block; padding: 2px 6px; font-size: 11px; margin: 0 4px 0 0;">编辑</button>
-                        ${isSystem ? '' : `<button class="btn-nav" onclick="deleteRule('${r.id}')" style="display: inline-block; padding: 2px 6px; font-size: 11px; margin: 0; color: var(--risk-high); border-color: #FECACA;">删除</button>`}
+                        <button class="btn-nav" onclick="deleteRule('${r.id}')" style="display: inline-block; padding: 2px 6px; font-size: 11px; margin: 0; color: var(--risk-high); border-color: #FECACA;">删除</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -2610,7 +3040,7 @@
             document.getElementById("edit-rule-desc").value = rule.description;
             document.getElementById("edit-rule-category").value = rule.category;
             
-            document.getElementById("edit-rule-category").disabled = rule.category === "系统预置";
+            document.getElementById("edit-rule-category").disabled = false;
             document.getElementById("rule-edit-modal").style.display = "flex";
         }
 
@@ -2633,9 +3063,7 @@
             if (rule) {
                 rule.name = name;
                 rule.description = desc;
-                if (rule.category !== "系统预置") {
-                    rule.category = category || "自定义规则";
-                }
+                rule.category = category || "自定义规则";
             }
             renderRulesList();
             closeRuleEditModal();
@@ -2645,79 +3073,6 @@
             if (confirm("确定要删除这条规则吗？")) {
                 currentRules = currentRules.filter(r => r.id !== id);
                 renderRulesList();
-            }
-        }
-
-        function renderVersionsTimeline() {
-            const container = document.getElementById("rule-versions-timeline");
-            if (!container) return;
-            container.innerHTML = "";
-
-            if (ruleVersions.length === 0) {
-                container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 20px;">无版本备份记录</div>`;
-                return;
-            }
-
-            const reversed = [...ruleVersions].reverse();
-            reversed.forEach(v => {
-                const item = document.createElement("div");
-                item.className = "timeline-item";
-                item.innerHTML = `
-                    <div class="timeline-dot"></div>
-                    <div class="timeline-content">
-                        <div class="timeline-time">${v.timestamp}</div>
-                        <div class="timeline-desc">${v.description}</div>
-                        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">包含规则: ${v.rules.length} 条 | ID: ${v.version_id}</div>
-                        <div class="timeline-action">
-                            <button class="btn-timeline-restore" onclick="restoreRuleVersion('${v.version_id}')">恢复此版本</button>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(item);
-            });
-        }
-
-        function createRuleVersion() {
-            const descEl = document.getElementById("version-desc-input");
-            const desc = descEl.value.trim();
-            if (!desc) {
-                alert("请输入规则版本快照备注！");
-                return;
-            }
-
-            fetch('/api/save_rule_version', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ description: desc })
-            })
-            .then(res => {
-                if (res.ok) {
-                    alert("规则快照备份成功！");
-                    descEl.value = "";
-                    loadRulesFromServer();
-                } else {
-                    alert("规则备份失败");
-                }
-            })
-            .catch(err => alert("规则备份出错: " + err));
-        }
-
-        function restoreRuleVersion(versionId) {
-            if (confirm("确定要恢复至该版本规则吗？当前未保存的更改将被覆盖。")) {
-                fetch('/api/load_rule_version', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ version_id: versionId })
-                })
-                .then(res => {
-                    if (res.ok) {
-                        alert("规则库已恢复！");
-                        loadRulesFromServer();
-                    } else {
-                        alert("规则恢复失败");
-                    }
-                })
-                .catch(err => alert("规则恢复出错: " + err));
             }
         }
 
@@ -2980,6 +3335,11 @@
                         <span id="toggle-password-visibility" onclick="togglePasswordVisibility()" style="position: absolute; right: 12px; cursor: pointer; user-select: none;">👁️</span>
                     </div>
                     <span class="input-hint">密钥保存在 ~/.baoyu-skills/.env 中，其他工具可共用。</span>
+                </div>
+                <div style="margin-top: 15px; padding: 12px; border-radius: 8px; background-color: var(--bg-body); border: 1px solid var(--border-color); font-size: 11px; line-height: 1.5; color: var(--text-muted);">
+                    <strong>💡 大模型运行差异说明：</strong><br/>
+                    • <strong>未配置大模型（本地模式）</strong>：可以使用完整的“文件自查”与“文本自查”功能（本地比对分析）。导入自定义规则时，系统将使用本地算法进行基本的字面重复与关键词冲突检测。<br/>
+                    • <strong>已配置大模型（增强模式）</strong>：在导入自定义或外部规则文档时，将通过大模型进行智能语义转化，去除无用的排版文字，自动提炼精简的规则名称及描述，并进行高精度的语义重复与冲突核验。
                 </div>
             </div>
             <div class="modal-footer">
