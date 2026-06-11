@@ -1453,19 +1453,8 @@
 
                             <!-- Primary Loaded Files list -->
                             <div class="file-list-area" id="primary-file-list-area" style="margin-top: 10px;">
-                                <div class="file-list-title">已加载的我方标书(1):</div>
-                                <div class="file-list-container" id="primary-file-list-container">
-                                    <div class="file-item active" id="file-primary-default">
-                                        <div class="file-item-left">
-                                            <span class="file-item-icon">📄</span>
-                                            <span class="file-item-name">数据易--3-9_标的3：技：数据架构深化设计与实施.docx</span>
-                                        </div>
-                                        <div class="file-item-right">
-                                            <span class="file-item-size">27.59 MB</span>
-                                            <span class="file-item-delete" onclick="deleteFile('primary', 'file-primary-default', event)">🗑️</span>
-                                        </div>
-                                    </div>
-                                </div>
+                                <div class="file-list-title">已加载的我方标书(0):</div>
+                                <div class="file-list-container" id="primary-file-list-container"></div>
                             </div>
                         </div>
 
@@ -1483,39 +1472,8 @@
 
                             <!-- Loaded Files list -->
                             <div class="file-list-area">
-                                <div class="file-list-title" id="secondary-list-title">已加载的对照方(3):</div>
-                                <div class="file-list-container" id="secondary-file-list-container">
-                                    <div class="file-item active" id="file-hualu" onclick="selectCompetitor('华路')">
-                                        <div class="file-item-left">
-                                            <span class="file-item-icon">📄</span>
-                                            <span class="file-item-name">华路--3-9_标的3：技：数据架构深化设计与..</span>
-                                        </div>
-                                        <div class="file-item-right">
-                                            <span class="file-item-size">21549 KB</span>
-                                            <span class="file-item-delete" onclick="deleteFile('secondary', 'file-hualu', event)">🗑️</span>
-                                        </div>
-                                    </div>
-                                    <div class="file-item" id="file-zhizhen" onclick="selectCompetitor('至臻云')">
-                                        <div class="file-item-left">
-                                            <span class="file-item-icon">📄</span>
-                                            <span class="file-item-name">至臻云--3-9_标的3：技：数据架构深化设计..</span>
-                                        </div>
-                                        <div class="file-item-right">
-                                            <span class="file-item-size">14776 KB</span>
-                                            <span class="file-item-delete" onclick="deleteFile('secondary', 'file-zhizhen', event)">🗑️</span>
-                                        </div>
-                                    </div>
-                                    <div class="file-item" id="file-zhuowei" onclick="selectCompetitor('卓维')">
-                                        <div class="file-item-left">
-                                            <span class="file-item-icon">📄</span>
-                                            <span class="file-item-name">卓维--3-9_标的3：技：数据架构深化设计..</span>
-                                        </div>
-                                        <div class="file-item-right">
-                                            <span class="file-item-size">7248 KB</span>
-                                            <span class="file-item-delete" onclick="deleteFile('secondary', 'file-zhuowei', event)">🗑️</span>
-                                        </div>
-                                    </div>
-                                </div>
+                                <div class="file-list-title" id="secondary-list-title">已加载的对照方(0):</div>
+                                <div class="file-list-container" id="secondary-file-list-container"></div>
                             </div>
                         </div>
                     </div>
@@ -1770,335 +1728,92 @@
 
     <!-- Data & Interactive Logic -->
     <script>
-        // Pre-computed collusion check data
-        const collusionData = {
-            "华路": {
-                summary: "共检测到 10 个高危排查点，存在严重的定制文本大面积雷同及完全一致的图片资产（MD5 碰撞），具有极高的围标串标嫌疑。",
-                issues: [
-                    {
-                        idx: 1,
-                        type: "TEXT",
-                        sec_page: "P70",
-                        pri_page: "P139",
-                        rate: 0.981,
-                        description: "[文本内容抄袭] 最长匹配: '对外宣传项目状况，项目组全体成员、项目经理每月项目信息共享，了解项目...'",
-                        pri_text: "对外宣传项目状况，项目组全体成员、项目经理每月项目信息共享，了解项目执行现状及偏差，提出纠偏措施与决策；对于项目重大决策问题，可组织临时项目评估会议进行研究决策，确保项目健康发展。",
-                        sec_text: "对外宣传项目状况，项目组全体成员、项目经理每月项目信息共享，了解项目执行现状及偏差，提出纠偏措施与决策；对于项目重大决策问题，可组织临时项目评估会议进行研究决策，确保项目健康发展。"
-                    },
-                    {
-                        idx: 2,
-                        type: "IMAGE",
-                        sec_page: "P80",
-                        pri_page: "P132,P298",
-                        rate: 0.950,
-                        description: "[配图一致] 两份标书含有完全相同的图片资源 (MD5: 1acc198a)",
-                        pri_text: "[嵌入拓扑图资产: project_methodology_flow.png]\nMD5: 1acc198a08f5c889a744e21a2212f84b\n图像宽: 1200px | 高: 850px\n\n主标书第 132 页及第 298 页使用的“项目实施全景流向图”图片二进制指纹与陪标书第 80 页高度吻合。",
-                        sec_text: "[嵌入拓扑图资产: project_methodology_flow.png]\nMD5: 1acc198a08f5c889a744e21a2212f84b\n图像宽: 1200px | 高: 850px\n\n陪标书第 80 页使用的“项目实施全景流向图”图片文件MD5与主标书完全一致，系直接复制文件所致。"
-                    },
-                    {
-                        idx: 3,
-                        type: "TEXT",
-                        sec_page: "P72-P73",
-                        pri_page: "P305-P306",
-                        rate: 0.949,
-                        description: "[文本内容抄袭] 连续2页文本匹配。第一匹配段: '风险的产生：任何一个项目的风险都不能够孤立来谈，可能造成项目失败...'",
-                        pri_text: "风险的产生：任何一个项目的风险都不能够孤立来谈，可能造成项目失败。风险管理必须贯穿于整个项目过程，由双方共同对显露的、潜伏的风险进行评估，并制定妥善的预防、回避、接受、转移、后备措施等五种应对策略，以确保工期安全。",
-                        sec_text: "风险的产生：任何一个项目的风险都不能够孤立来谈，可能造成项目失败。风险管理必须贯穿于整个项目过程，由双方共同对显露的、潜伏的风险进行评估，并制定妥善的预防、回避、接受、转移、后备措施等五种应对策略，以确保工期安全。"
-                    },
-                    {
-                        idx: 4,
-                        type: "TEXT",
-                        sec_page: "P67-P68",
-                        pri_page: "P129-P130",
-                        rate: 0.887,
-                        description: "[文本内容抄袭] 连续2页文本匹配。第一匹配段: '需要发生变更，需要按照需求变更管理流程执行需求变更梳理，和确定新...'",
-                        pri_text: "需要发生变更，需要按照需求变更管理流程执行需求变更梳理，和确定新需求工作量评估。对于未在招标文件范围内的新增需求，应由双方项目团队进行评审，并签字确认为变更补充协议，严禁口头承诺即实施。",
-                        sec_text: "需要发生变更，需要按照需求变更管理流程执行需求变更梳理，和确定新需求工作量评估。对于未在招标文件范围内的新增需求，应由双方项目团队进行评审，并签字确认为变更补充协议，严禁口头承诺即实施。"
-                    },
-                    {
-                        idx: 5,
-                        type: "TEXT",
-                        sec_page: "P81",
-                        pri_page: "P299",
-                        rate: 0.866,
-                        description: "[文本内容抄袭] 最长匹配: '项目实施必须遵循科学技术工作的客观规律，严格按照科学的设计程序...'",
-                        pri_text: "项目实施必须遵循科学技术工作的客观规律，严格按照科学的设计程序和严格的质量控制体系运行。我司将在项目前期制定质量方针，明确检查监督职责，确保每一阶段成果均通过质量预控和终检。",
-                        sec_text: "项目实施必须遵循科学技术工作的客观规律，严格按照科学的设计程序和严格的质量控制体系运行。我司将在项目前期制定质量方针，明确检查监督职责，确保每一阶段成果均通过质量预控和终检。"
-                    },
-                    {
-                        idx: 6,
-                        type: "TEXT",
-                        sec_page: "P81",
-                        pri_page: "P133",
-                        rate: 0.862,
-                        description: "[文本内容抄袭] 最长匹配: '项目实施必须遵循科学技术工作的客观规律，严格按照科学的设计程序...'",
-                        pri_text: "项目实施必须遵循科学技术工作的客观规律，严格按照科学的设计程序和严格的质量控制体系运行。我司将在项目前期制定质量方针，明确检查监督职责，确保每一阶段成果均通过质量预控和终检。",
-                        sec_text: "项目实施必须遵循科学技术工作的客观规律，严格按照科学的设计程序和严格的质量控制体系运行。我司将在项目前期制定质量方针，明确检查监督职责，确保每一阶段成果均通过质量预控和终检。"
-                    },
-                    {
-                        idx: 7,
-                        type: "TEXT",
-                        sec_page: "P69",
-                        pri_page: "P138",
-                        rate: 0.828,
-                        description: "[文本内容抄袭] 最长匹配: '2沟通协调机制项目小组常态沟通机制针对项目的开展与实施践行常...'",
-                        pri_text: "2.沟通协调机制：项目小组常态沟通机制针对项目的开展与实施，践行常态化周报、双周报及月报机制，确保招标人专责能够实时掌握技术架构梳理进度及存在的瓶颈问题，及时调度内外部资源予以协调解决。",
-                        sec_text: "2.沟通协调机制：项目小组常态沟通机制针对项目的开展与实施，践行常态化周报、双周报及月报机制，确保招标人专责能够实时掌握技术架构梳理进度及存在的瓶颈问题，及时调度内外部资源予以协调解决。"
-                    },
-                    {
-                        idx: 8,
-                        type: "TEXT",
-                        sec_page: "P77",
-                        pri_page: "P309",
-                        rate: 0.810,
-                        description: "[文本内容抄袭] 最长匹配: '成本费用项目进度等方面分散风险开脱责任但转移风险的同时也必然...'",
-                        pri_text: "成本费用、项目进度等方面分散风险、开脱责任，但转移风险的同时，也必然要给承担风险的第三方以相应的报酬，如购买项目保险或实施分包分摊风险责任，从而维持项目利益平衡。",
-                        sec_text: "成本费用、项目进度等方面分散风险、开脱责任，但转移风险的同时，也必然要给承担风险的第三方以相应的报酬，如购买项目保险或实施分包分摊风险责任，从而维持项目利益平衡。"
-                    },
-                    {
-                        idx: 9,
-                        type: "TEXT",
-                        sec_page: "P46",
-                        pri_page: "P5",
-                        rate: 0.778,
-                        description: "[文本内容抄袭] 最长匹配: '在数据架构体制机制全生命周期管理各方面均取得了一定成效并于2...'",
-                        pri_text: "在数据架构体制机制、全生命周期管理各方面均取得了一定成效，并于2024年底前完成了概念层、逻辑层数据模型的全量盘点工作，初步奠定了全域企业级架构管控基石。",
-                        sec_text: "在数据架构体制机制、全生命周期管理各方面均取得了一定成效，并于2024年底前完成了概念层、逻辑层数据模型的全量盘点工作，初步奠定了全域企业级架构管控基石。"
-                    },
-                    {
-                        idx: 10,
-                        type: "META",
-                        sec_page: "全档",
-                        pri_page: "全档",
-                        rate: 0.400,
-                        description: "[属性一致] 两份标书的PDF生成器 (Producer) 相同: 'iText 2.1.7 by 1T3XT'",
-                        pri_text: "PDF 文档元数据属性：\n/Producer: iText 2.1.7 by 1T3XT\n/Creator: None\n/Author: None",
-                        sec_text: "PDF 文档元数据属性：\n/Producer: iText 2.1.7 by 1T3XT\n/Creator: None\n/Author: None"
-                    }
-                ]
-            },
-            "至臻云": {
-                summary: "检测到的主要重合点为招标文件格式模板条款（已智能标记并降权），但在风险总结与方法论陈述部分（P121/P316、P119/P314）仍存在明显的段落文本雷同，需注意排查泄密或复制风险。",
-                issues: [
-                    {
-                        idx: 1,
-                        type: "TEXT",
-                        sec_page: "P121",
-                        pri_page: "P316",
-                        rate: 0.844,
-                        description: "[文本内容抄袭] 最长匹配: '还将定期对风险管理工作进行总结与反思，工作不断优化与改进，风险保...'",
-                        pri_text: "还将定期对风险管理工作进行总结与反思，工作不断优化与改进，风险控制专责须定期编制《项目风险防范与控制执行月度报告》，提交至联合协调委员会进行备案与评审，防患于未然。",
-                        sec_text: "还将定期对风险管理工作进行总结与反思，工作不断优化与改进，风险控制专责须定期编制《项目风险防范与控制执行月度报告》，提交至联合协调委员会进行备案与评审，防患于未然。"
-                    },
-                    {
-                        idx: 2,
-                        type: "TEXT",
-                        sec_page: "P119",
-                        pri_page: "P314",
-                        rate: 0.655,
-                        description: "[文本内容抄袭] 最长匹配: '据模型的设计质量与运行效率，运营协同机制设计，建立数据架构与业务...'",
-                        pri_text: "保证数据模型的设计质量与运行效率，运营协同机制设计，建立数据架构与业务架构、应用架构等其他架构资产之间的联动与映射机制，实现企业架构（EA）一体化融合管控，支撑核心业务场景落地。",
-                        sec_text: "保证数据模型的设计质量与运行效率，运营协同机制设计，建立数据架构与业务架构、应用架构等其他架构资产之间的联动与映射机制，实现企业架构（EA）一体化融合管控，支撑核心业务场景落地。"
-                    },
-                    {
-                        idx: 3,
-                        type: "TEXT",
-                        sec_page: "P91",
-                        pri_page: "P147",
-                        rate: 0.580,
-                        description: "[文本内容抄袭] 最长匹配: '1重点业务流程应用功能和元数据盘点方法论word2数据架构映...'",
-                        pri_text: "本阶段的核心产出物包括：\n1. 重点业务流程、应用功能和元数据盘点方法论 (word)\n2. 数据架构映射模板与运营协同机制设计文件\n3. 概念/逻辑模型与应用架构关联盘点明细表 (excel)",
-                        sec_text: "本阶段的核心产出物包括：\n1. 重点业务流程、应用功能和元数据盘点方法论 (word)\n2. 数据架构映射模板与运营协同机制设计文件\n3. 概念/逻辑模型与应用架构关联盘点明细表 (excel)"
-                    },
-                    {
-                        idx: 4,
-                        type: "TEXT",
-                        sec_page: "P118",
-                        pri_page: "P313",
-                        rate: 0.555,
-                        description: "[文本内容抄袭] 最长匹配: '之处为后续的优化设计工作提供有力支撑方法论设计基于评估结果结...'",
-                        pri_text: "找出不合规范之处，为后续的优化设计工作提供有力支撑。方法论设计基于评估结果进行迭代演进，以解决实际运营中存在的数据孤岛问题，建立常态化管控闭环。",
-                        sec_text: "找出不合规范之处，为后续的优化设计工作提供有力支撑。方法论设计基于评估结果进行迭代演进，以解决实际运营中存在的数据孤岛问题，建立常态化管控闭环。"
-                    },
-                    {
-                        idx: 5,
-                        type: "TEXT",
-                        sec_page: "P182",
-                        pri_page: "P147",
-                        rate: 0.552,
-                        description: "[文本内容抄袭] 最长匹配: '1重点业务流程应用功能和元数据盘点方法论word2数据架构映...'",
-                        pri_text: "本阶段的核心产出物包括：\n1. 重点业务流程、应用功能和元数据盘点方法论 (word)\n2. 数据架构映射模板与运营协同机制设计文件\n3. 概念/逻辑模型与应用架构关联盘点明细表 (excel)",
-                        sec_text: "本阶段的核心产出物包括：\n1. 重点业务流程、应用功能和元数据盘点方法论 (word)\n2. 数据架构映射模板与运营协同机制设计文件\n3. 概念/逻辑模型与应用架构关联盘点明细表 (excel)"
-                    },
-                    {
-                        idx: 6,
-                        type: "META",
-                        sec_page: "全档",
-                        pri_page: "全档",
-                        rate: 0.400,
-                        description: "[属性一致] 两份标书的PDF生成器相同: 'iText 2.1.7 by 1T3XT'",
-                        pri_text: "PDF 元数据:\n/Producer: iText 2.1.7 by 1T3XT",
-                        sec_text: "PDF 元数据:\n/Producer: iText 2.1.7 by 1T3XT"
-                    },
-                    {
-                        idx: 7,
-                        type: "TEMPLATE",
-                        sec_page: "P3",
-                        pri_page: "P4",
-                        rate: 0.092, // original 91.5% downweighted by 10
-                        description: "[标书模板内容未删除] 标书模板内容未删除。匹配: '注1投标人对招标文件含技术规范书的所有条款条件及规定的任何技...'",
-                        pri_text: "注1：投标人对招标文件（含技术规范书）的所有条款、条件及规定的任何技术性偏离、保留，均应在“技术偏差表”中汇总列出，否则将被视为完全响应。",
-                        sec_text: "注1：投标人对招标文件（含技术规范书）的所有条款、条件及规定的任何技术性偏离、保留，均应在“技术偏差表”中汇总列出，否则将被视为完全响应。"
-                    },
-                    {
-                        idx: 8,
-                        type: "TEMPLATE",
-                        sec_page: "P8",
-                        pri_page: "P28",
-                        rate: 0.088, // original 87.8% downweighted by 10
-                        description: "[标书模板内容未删除] 标书模板内容未删除。匹配: '技术管控按所投对应标的标包提供如不涉及本项内容则无需提供注请...'",
-                        pri_text: "技术管控：按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，详细描述方案并提供支撑材料。",
-                        sec_text: "技术管控：按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，详细描述方案并提供支撑材料。"
-                    },
-                    {
-                        idx: 9,
-                        type: "TEMPLATE",
-                        sec_page: "P10",
-                        pri_page: "P29",
-                        rate: 0.088,
-                        description: "[标书模板内容未删除] 标书模板内容未删除。匹配: '集成能力按所投对应标的标包提供如不涉及本项内容则无需提供注请...'",
-                        pri_text: "集成能力：按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，详细描述方案并提供支撑材料。",
-                        sec_text: "集成能力：按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，详细描述方案并提供支撑材料。"
-                    },
-                    {
-                        idx: 10,
-                        type: "TEMPLATE",
-                        sec_page: "P181",
-                        pri_page: "P419",
-                        rate: 0.088,
-                        description: "[标书模板内容未删除] 标书模板内容未删除。匹配: '交货安装调试和验收方案按所投对应标的标包提供如不涉及本项内容...'",
-                        pri_text: "交货安装调试和验收方案：按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，详细描述方案并提供支撑材料。",
-                        sec_text: "交货安装调试和验收方案：按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，详细描述方案并提供支撑材料。"
-                    }
-                ]
-            },
-            "卓维": {
-                summary: "该标书的安全程度相对较高，绝大多数重合点为南方电网招标文件的标准格式条款（已自动分类并大幅降权），但在主框架与业务对象盘点输出物格式定义处仍有少量雷同（P85/P147），建议微调该页的陈述语序。",
-                issues: [
-                    {
-                        idx: 1,
-                        type: "TEXT",
-                        sec_page: "P85",
-                        pri_page: "P147",
-                        rate: 0.512,
-                        description: "[文本内容抄袭] 最长匹配: '1重点业务流程应用功能和元数据盘点方法论word2数据架构映...'",
-                        pri_text: "本阶段的核心产出物包括：\n1. 重点业务流程、应用功能和元数据盘点方法论 (word)\n2. 数据架构映射模板与运营协同机制设计文件\n3. 概念/逻辑模型与应用架构关联盘点明细表 (excel)",
-                        sec_text: "本阶段的核心产出物包括：\n1. 重点业务流程、应用功能和元数据盘点方法论 (word)\n2. 数据架构映射模板与运营协同机制设计文件\n3. 概念/逻辑模型与应用架构关联盘点明细表 (excel)"
-                    },
-                    {
-                        idx: 2,
-                        type: "TEXT",
-                        sec_page: "P105",
-                        pri_page: "P147",
-                        rate: 0.410,
-                        description: "[文本内容抄袭] 最长匹配: '1重点业务流程应用功能和元数据盘点方法论word2数据架构映...'",
-                        pri_text: "本阶段的核心产出物包括：\n1. 重点业务流程、应用功能和元数据盘点方法论 (word)\n2. 数据架构映射模板与运营协同机制设计文件\n3. 概念/逻辑模型与应用架构关联盘点明细表 (excel)",
-                        sec_text: "本阶段的核心产出物包括：\n1. 重点业务流程、应用功能和元数据盘点方法论 (word)\n2. 数据架构映射模板与运营协同机制设计文件\n3. 概念/逻辑模型与应用架构关联盘点明细表 (excel)"
-                    },
-                    {
-                        idx: 3,
-                        type: "META",
-                        sec_page: "全档",
-                        pri_page: "全档",
-                        rate: 0.400,
-                        description: "[属性一致] 两份标书的PDF生成器相同: 'iText 2.1.7 by 1T3XT'",
-                        pri_text: "PDF 元数据:\n/Producer: iText 2.1.7 by 1T3XT",
-                        sec_text: "PDF 元数据:\n/Producer: iText 2.1.7 by 1T3XT"
-                    },
-                    {
-                        idx: 4,
-                        type: "TEXT",
-                        sec_page: "P3",
-                        pri_page: "P5",
-                        rate: 0.319,
-                        description: "[文本内容抄袭] 最长匹配: '覆盖重要业务领域重点协同场景和核心业务对象的数据架构显著提升...'",
-                        pri_text: "本项目的目标是建立一个能够覆盖重要业务领域、重点协同场景和核心业务对象的数据架构，显著提升南方电网企业级数据资产的使用效率与协同效率。",
-                        sec_text: "本项目的目标是建立一个能够覆盖重要业务领域、重点协同场景和核心业务对象的数据架构，显著提升南方电网企业级数据资产的使用效率与协同效率。"
-                    },
-                    {
-                        idx: 5,
-                        type: "TEXT",
-                        sec_page: "P85",
-                        pri_page: "P146",
-                        rate: 0.249,
-                        description: "[文本内容抄袭] 最长匹配: '1数据架构蓝图及数据模型的管控规则excel2逻辑层数据模型...'",
-                        pri_text: "项目交付交付物要求如下：\n1. 数据架构蓝图及数据模型的管控规则 (excel)\n2. 逻辑层数据模型设计与规范说明文档",
-                        sec_text: "项目交付交付物要求如下：\n1. 数据架构蓝图及数据模型的管控规则 (excel)\n2. 逻辑层数据模型设计与规范说明文档"
-                    },
-                    {
-                        idx: 6,
-                        type: "TEMPLATE",
-                        sec_page: "P10",
-                        pri_page: "P28",
-                        rate: 0.089, // original 89.2% downweighted by 10
-                        description: "[标书模板内容未删除] 标书模板内容未删除。匹配: '技术管控按所投对应标的标包提供如不涉及本项内容则无需提供注请...'",
-                        pri_text: "技术管控：按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，详细描述方案并提供支撑材料。",
-                        sec_text: "技术管控：按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，详细描述方案并提供支撑材料。"
-                    },
-                    {
-                        idx: 7,
-                        type: "TEMPLATE",
-                        sec_page: "P202",
-                        pri_page: "P421",
-                        rate: 0.087, // original 87.7% downweighted by 10
-                        description: "[标书模板内容未删除] 标书模板内容未删除。匹配: '案例按所投对应标的标包提供如不涉及本项内容则无需提供注请根据...'",
-                        pri_text: "案例：按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，提供实施成功案例合同页扫描件。",
-                        sec_text: "案例：按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，提供实施成功案例合同页扫描件。"
-                    },
-                    {
-                        idx: 8,
-                        type: "TEMPLATE",
-                        sec_page: "P202",
-                        pri_page: "P28",
-                        rate: 0.086,
-                        description: "[标书模板内容未删除] 标书模板内容未删除。匹配: '按所投对应标的标包提供如不涉及本项内容则无需提供注请根据技术...'",
-                        pri_text: "按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，详细描述方案并提供支撑材料。",
-                        sec_text: "按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，详细描述方案并提供支撑材料。"
-                    },
-                    {
-                        idx: 9,
-                        type: "TEMPLATE",
-                        sec_page: "P202",
-                        pri_page: "P29",
-                        rate: 0.086,
-                        description: "[标书模板内容未删除] 标书模板内容未删除。匹配: '按所投对应标的标包提供如不涉及本项内容则无需提供注请根据技术...'",
-                        pri_text: "按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，详细描述方案并提供支撑材料。",
-                        sec_text: "按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，详细描述方案并提供支撑材料。"
-                    },
-                    {
-                        idx: 10,
-                        type: "TEMPLATE",
-                        sec_page: "P202",
-                        pri_page: "P254",
-                        rate: 0.086,
-                        description: "[标书模板内容未删除] 标书模板内容未删除。匹配: '按所投对应标的标包提供如不涉及本项内容则无需提供注请根据技术...'",
-                        pri_text: "按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，详细描述方案并提供支撑材料。",
-                        sec_text: "按所投对应标的、标包提供（如不涉及本项内容则无需提供）。注：请根据技术规范要求，详细描述方案并提供支撑材料。"
-                    }
-                ]
-            }
-        };
+        // Pre-computed collusion check data (loaded dynamically if demo_data.json exists)
+        let collusionData = {};
 
         let currentCompetitor = "华路";
         let currentFilterType = "ALL";
         let activeIssueIndex = -1;
         let currentMode = "file"; // default mode
 
+        function loadDemoDataIfExists() {
+            fetch('/demo_data.json')
+                .then(res => {
+                    if (res.ok) {
+                        return res.json();
+                    }
+                    throw new Error("No demo data available");
+                })
+                .then(data => {
+                    if (data && data.collusionData) {
+                        collusionData = data.collusionData;
+                        
+                        // Populate primary files
+                        const priContainer = document.getElementById("primary-file-list-container");
+                        if (priContainer && data.primary_files) {
+                            priContainer.innerHTML = "";
+                            data.primary_files.forEach(file => {
+                                const item = document.createElement("div");
+                                item.className = "file-item active";
+                                item.id = file.id;
+                                item.innerHTML = `
+                                    <div class="file-item-left">
+                                        <span class="file-item-icon">📄</span>
+                                        <span class="file-item-name">${file.name}</span>
+                                    </div>
+                                    <div class="file-item-right">
+                                        <span class="file-item-size">${file.size}</span>
+                                        <span class="file-item-delete" onclick="deleteFile('primary', '${file.id}', event)">🗑️</span>
+                                    </div>
+                                `;
+                                priContainer.appendChild(item);
+                                primaryFileCount++;
+                            });
+                        }
+
+                        // Populate secondary files
+                        const secContainer = document.getElementById("secondary-file-list-container");
+                        if (secContainer && data.secondary_files) {
+                            secContainer.innerHTML = "";
+                            data.secondary_files.forEach(file => {
+                                const item = document.createElement("div");
+                                item.className = "file-item" + (file.competitor === currentCompetitor ? " active" : "");
+                                item.id = file.id;
+                                item.onclick = (e) => {
+                                    if (e.target.classList.contains('file-item-delete')) return;
+                                    selectCompetitor(file.competitor);
+                                };
+                                item.innerHTML = `
+                                    <div class="file-item-left">
+                                        <span class="file-item-icon">📄</span>
+                                        <span class="file-item-name">${file.name}</span>
+                                    </div>
+                                    <div class="file-item-right">
+                                        <span class="file-item-size">${file.size}</span>
+                                        <span class="file-item-delete" onclick="deleteFile('secondary', '${file.id}', event)">🗑️</span>
+                                    </div>
+                                `;
+                                secContainer.appendChild(item);
+                                secondaryFileCount++;
+                            });
+                        }
+                        updateFileCounts();
+                    }
+                })
+                .catch(err => {
+                    console.log("Running in clean mode (no demo data loaded).");
+                    collusionData = {};
+                    primaryFileCount = 0;
+                    secondaryFileCount = 0;
+                    updateFileCounts();
+                });
+        }
+
         // Populate initial UI elements
         window.onload = function() {
             switchMode('file');
-            updateFileCounts();
             loadHistoryFromServer();
+            loadDemoDataIfExists();
         };
 
         function switchMode(mode) {
@@ -2161,8 +1876,8 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
         }
 
-        let primaryFileCount = 1;
-        let secondaryFileCount = 3;
+        let primaryFileCount = 0;
+        let secondaryFileCount = 0;
 
         function handleFileSelect(event, type) {
             const files = event.target.files;
@@ -2243,6 +1958,10 @@
 
         // Start analysis animation
         function startSelfCheck(isHistoryRecall = false) {
+            if (!isHistoryRecall && currentMode === 'file' && (primaryFileCount === 0 || secondaryFileCount === 0)) {
+                alert("请先上传我方标书及对照标书进行自查排查！");
+                return;
+            }
             const loading = document.getElementById("loading-area");
             const results = document.getElementById("results-area");
             
