@@ -35,6 +35,17 @@ function Stop-BidShieldServer {
                 $killed = $true
             }
         }
+        
+        # Also kill any running compiled executables of BidShield
+        $exeProcesses = Get-Process -Name "投标自查卫士" -ErrorAction SilentlyContinue
+        if ($exeProcesses) {
+            foreach ($ep in $exeProcesses) {
+                Write-Host "🛑 正在停止已运行的 投标自查卫士 可执行程序 (PID: $($ep.Id))... " -ForegroundColor Yellow
+                Stop-Process -Id $ep.Id -Force -ErrorAction SilentlyContinue
+                $killed = $true
+            }
+        }
+        
         if ($killed) {
             Start-Sleep -Seconds 1
         }
@@ -196,10 +207,15 @@ while ($true) {
                 "-m", "PyInstaller",
                 "--name=投标自查卫士",
                 "--add-data=index.html;.",
-                "--add-data=logo.png;.",
-                "--add-data=hualu_result.txt;.",
-                "--add-data=zhizhenyun_result.txt;.",
-                "--add-data=zhuowei_result.txt;.",
+                "--add-data=logo.png;."
+            )
+            
+            $demoPath = Join-Path $PSScriptRoot "demo_data.json"
+            if (Test-Path $demoPath) {
+                $argsList += "--add-data=demo_data.json;."
+            }
+            
+            $argsList += @(
                 "--onefile",
                 "server.py"
             )
@@ -256,6 +272,8 @@ while ($true) {
         }
     }
 }
+
+
 
 
 
