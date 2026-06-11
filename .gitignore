@@ -3,3 +3,12 @@ __pycache__/
 *.pyc
 .DS_Store
 service.log
+
+# PyInstaller & Build artifacts
+build/
+dist/
+*.spec
+
+# Portable Python
+python_embed/
+*.zip
