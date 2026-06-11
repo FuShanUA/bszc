@@ -37,7 +37,7 @@ function Stop-BidShieldServer {
         }
         
         # Also kill any running compiled executables of BidShield
-        $exeProcesses = Get-Process -Name "投标自查卫士" -ErrorAction SilentlyContinue
+        $exeProcesses = Get-Process -Name "bszc", "投标自查卫士" -ErrorAction SilentlyContinue
         if ($exeProcesses) {
             foreach ($ep in $exeProcesses) {
                 Write-Host "🛑 正在停止已运行的 投标自查卫士 可执行程序 (PID: $($ep.Id))... " -ForegroundColor Yellow
@@ -205,7 +205,7 @@ while ($true) {
             # Execute PyInstaller via python module runner for maximum stability
             $argsList = @(
                 "-m", "PyInstaller",
-                "--name=投标自查卫士",
+                "--name=bszc",
                 "--add-data=index.html;.",
                 "--add-data=logo.png;."
             )
@@ -222,9 +222,9 @@ while ($true) {
             
             & $PythonCmd $argsList
             
-            if ($LASTEXITCODE -eq 0 -and (Test-Path (Join-Path $PSScriptRoot "dist\投标自查卫士.exe"))) {
+            if ($LASTEXITCODE -eq 0 -and (Test-Path (Join-Path $PSScriptRoot "dist\bszc.exe"))) {
                 Write-Host "`n✔ 打包成功！独立可执行文件已生成在： " -ForegroundColor Green
-                Write-Host "👉 $(Join-Path $PSScriptRoot 'dist\投标自查卫士.exe') " -ForegroundColor Green
+                Write-Host "👉 $(Join-Path $PSScriptRoot 'dist\bszc.exe') " -ForegroundColor Green
                 Write-Host "`n✨ 您可以将该文件发送给其他 Windows 用户，双击即可无依赖运行！ " -ForegroundColor Green
             } else {
                 Write-Host "`n❌ 打包失败，请检查上方 PyInstaller 报错信息。 " -ForegroundColor Red
@@ -246,7 +246,7 @@ while ($true) {
             
             $buildDir = Join-Path $PSScriptRoot "build"
             $distDir = Join-Path $PSScriptRoot "dist"
-            $specFile = Join-Path $PSScriptRoot "投标自查卫士.spec"
+            $specFile = Join-Path $PSScriptRoot "bszc.spec"
             
             if (Test-Path $buildDir) {
                 Remove-Item -Recurse -Force $buildDir
@@ -258,7 +258,7 @@ while ($true) {
             }
             if (Test-Path $specFile) {
                 Remove-Item -Force $specFile
-                Write-Host "✔ 已清理 投标自查卫士.spec 文件 " -ForegroundColor Green
+                Write-Host "✔ 已清理 bszc.spec 文件 " -ForegroundColor Green
             }
             
             Write-Host "`n✔ 临时文件清理完毕！ " -ForegroundColor Green
@@ -272,6 +272,7 @@ while ($true) {
         }
     }
 }
+
 
 
 
