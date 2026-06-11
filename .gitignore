@@ -12,3 +12,8 @@ dist/
 # Portable Python
 python_embed/
 *.zip
+
+# Demo result data (kept locally only)
+hualu_result.txt
+zhizhenyun_result.txt
+zhuowei_result.txt
