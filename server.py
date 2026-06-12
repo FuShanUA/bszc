@@ -12,8 +12,67 @@ import hashlib
 import datetime
 from difflib import SequenceMatcher
 import pypdf
+from email.parser import BytesParser
 
 PORT = 8000
+
+def parse_multipart_bytes(body, boundary):
+    primary_files = []
+    secondary_files = []
+    
+    boundary_bytes = b"--" + boundary.encode('utf-8')
+    chunks = body.split(boundary_bytes)
+    
+    for chunk in chunks:
+        if not chunk or chunk.strip() == b"" or chunk.strip() == b"--":
+            continue
+            
+        if chunk.startswith(b"\r\n"):
+            chunk = chunk[2:]
+        elif chunk.startswith(b"\n"):
+            chunk = chunk[1:]
+            
+        if b"\r\n\r\n" not in chunk:
+            continue
+            
+        header_bytes, file_bytes = chunk.split(b"\r\n\r\n", 1)
+        
+        if file_bytes.endswith(b"\r\n"):
+            file_bytes = file_bytes[:-2]
+        elif file_bytes.endswith(b"\n"):
+            file_bytes = file_bytes[:-1]
+            
+        headers_lines = header_bytes.split(b"\r\n")
+        content_disposition = b""
+        for line in headers_lines:
+            if line.lower().startswith(b"content-disposition:"):
+                content_disposition = line
+                break
+                
+        if not content_disposition:
+            continue
+            
+        name_match = re.search(b'name="([^"]+)"', content_disposition, re.IGNORECASE)
+        filename_match = re.search(b'filename="([^"]+)"', content_disposition, re.IGNORECASE)
+        
+        if name_match and filename_match:
+            try:
+                name_val = name_match.group(1).decode('utf-8')
+            except Exception:
+                name_val = name_match.group(1).decode('latin-1')
+            try:
+                filename_val = filename_match.group(1).decode('utf-8')
+            except Exception:
+                filename_val = filename_match.group(1).decode('latin-1')
+            
+            if name_val == 'primary_files':
+                primary_files.append((filename_val, file_bytes))
+            elif name_val == 'secondary_files':
+                secondary_files.append((filename_val, file_bytes))
+                
+    return primary_files, secondary_files
+
+
 
 PRESETS = [
     {
@@ -106,6 +165,8 @@ def save_rules_db(db):
         return False
 
 HISTORY_FILE = os.path.expanduser("~/.baoyu-skills/history_db.json")
+LATEST_COLLUSION_DATA = {}
+
 
 def load_history_db():
     if os.path.exists(HISTORY_FILE):
@@ -257,6 +318,411 @@ def extract_rules_from_file(filename, file_bytes):
             })
     return rules
 
+def simplify_bidder_name(name):
+    if "华路" in name:
+        return "华路"
+    if "至臻云" in name:
+        return "至臻云"
+    if "卓维" in name:
+        return "卓维"
+    if "数据易" in name:
+        return "数据易"
+    cleaned = re.sub(r'^(北京|广东|上海|深圳|天津|重庆|四川|江苏|浙江|山东|福建|湖北|湖南|河南|河北|安徽|江西|陕西|辽宁|吉林|黑龙江|山西|甘肃|青海|海南|云南|贵州|广西|内蒙古|西藏|宁夏|新疆)', '', name)
+    cleaned = re.sub(r'(股份有限公司|有限责任公司|有限公司|信息技术|智能科技|网络)$', '', cleaned)
+    return cleaned
+
+def check_collusion_compare_wrapper(primary_path, secondary_path):
+    from collections import defaultdict
+    import sys
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    import check_collusion
+    
+    issues = []
+    
+    # 1. Compare metadata
+    meta_matches = check_collusion.compare_metadata(primary_path, secondary_path)
+    for m in meta_matches:
+        try:
+            pri_reader = pypdf.PdfReader(primary_path)
+            sec_reader = pypdf.PdfReader(secondary_path)
+            pri_meta = json.dumps(pri_reader.metadata or {}, ensure_ascii=False, indent=2)
+            sec_meta = json.dumps(sec_reader.metadata or {}, ensure_ascii=False, indent=2)
+        except:
+            pri_meta, sec_meta = "", ""
+        issues.append({
+            "type": "META",
+            "sec_page": m["secondary_pages"],
+            "pri_page": m["primary_pages"],
+            "rate": m["suspicion_rate"],
+            "description": m["description"],
+            "pri_text": f"主标书元数据:\n{pri_meta}",
+            "sec_text": f"对照标书元数据:\n{sec_meta}"
+        })
+        
+    # 2. Compare images
+    image_matches = check_collusion.compare_images(primary_path, secondary_path)
+    for m in image_matches:
+        desc = m["description"].replace("[配图一致]", f"[配图一致] (主标{m['primary_pages']} - 陪标{m['secondary_pages']})")
+        issues.append({
+            "type": "IMAGE",
+            "sec_page": m["secondary_pages"],
+            "pri_page": m["primary_pages"],
+            "rate": m["suspicion_rate"],
+            "description": desc,
+            "pri_text": f"图片资源哈希一致，出现在主标书的: {m['primary_pages']}",
+            "sec_text": f"图片资源哈希一致，出现在对照标书的: {m['secondary_pages']}"
+        })
+        
+    # 3. Compare text pages
+    try:
+        pri_reader = pypdf.PdfReader(primary_path)
+        sec_reader = pypdf.PdfReader(secondary_path)
+    except:
+        return issues
+        
+    primary_pages_clean = []
+    primary_pages_raw = []
+    for page in pri_reader.pages:
+        raw = page.extract_text() or ""
+        primary_pages_raw.append(raw)
+        primary_pages_clean.append(check_collusion.clean_text(raw))
+        
+    secondary_pages_clean = []
+    secondary_pages_raw = []
+    for page in sec_reader.pages:
+        raw = page.extract_text() or ""
+        secondary_pages_raw.append(raw)
+        secondary_pages_clean.append(check_collusion.clean_text(raw))
+        
+    sec_ngram_index = defaultdict(list)
+    ngram_size = 15
+    for sec_idx, sec_text in enumerate(secondary_pages_clean):
+        sec_page_num = sec_idx + 1
+        if len(sec_text) < ngram_size:
+            continue
+        for i in range(len(sec_text) - ngram_size + 1):
+            ngram = sec_text[i:i+ngram_size]
+            sec_ngram_index[ngram].append(sec_page_num)
+            
+    candidates = defaultdict(int)
+    for pri_idx, pri_text in enumerate(primary_pages_clean):
+        pri_page_num = pri_idx + 1
+        if len(pri_text) < ngram_size:
+            continue
+        for i in range(len(pri_text) - ngram_size + 1):
+            ngram = pri_text[i:i+ngram_size]
+            if ngram in sec_ngram_index:
+                for sec_page_num in sec_ngram_index[ngram]:
+                    candidates[(pri_page_num, sec_page_num)] += 1
+                    
+    min_match_len = 20
+    for (pri_page, sec_page), common_count in candidates.items():
+        if common_count < 3:
+            continue
+            
+        pri_text_clean = primary_pages_clean[pri_page - 1]
+        sec_text_clean = secondary_pages_clean[sec_page - 1]
+        
+        matcher = SequenceMatcher(None, pri_text_clean, sec_text_clean)
+        matching_blocks = matcher.get_matching_blocks()
+        
+        total_match_len = 0
+        longest_match = ""
+        for block in matching_blocks:
+            if block.size >= min_match_len:
+                total_match_len += block.size
+                match_str = pri_text_clean[block.a : block.a + block.size]
+                if len(match_str) > len(longest_match):
+                    longest_match = match_str
+                    
+        if total_match_len > 0:
+            min_len = min(len(pri_text_clean), len(sec_text_clean))
+            susp_rate = total_match_len / min_len if min_len > 0 else 0
+            
+            if susp_rate >= 0.10:
+                match_type = check_collusion.classify_match(longest_match)
+                
+                if match_type == "标书模板内容未删除":
+                    reported_type = "TEMPLATE"
+                    desc = f"[模板未删] (主标P{pri_page} - 陪标P{sec_page}) 模板匹配率较高。最长匹配: '{longest_match[:25]}...'"
+                    reported_susp_rate = susp_rate * 0.10
+                else:
+                    reported_type = "TEXT"
+                    desc = f"[文本抄袭] (主标P{pri_page} - 陪标P{sec_page}) 文本重合率高。最长匹配: '{longest_match[:25]}...'"
+                    reported_susp_rate = susp_rate
+                    
+                issues.append({
+                    "type": reported_type,
+                    "sec_page": f"P{sec_page}",
+                    "pri_page": f"P{pri_page}",
+                    "rate": reported_susp_rate,
+                    "description": desc,
+                    "pri_text": primary_pages_raw[pri_page - 1],
+                    "sec_text": secondary_pages_raw[sec_page - 1]
+                })
+                
+    issues = sorted(issues, key=lambda x: x["rate"], reverse=True)
+    for idx, iss in enumerate(issues, 1):
+        iss["idx"] = idx
+        
+    return issues
+
+def generate_docx_report(competitor, data):
+
+    from docx import Document
+    from docx.shared import Inches, Pt, RGBColor
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import nsdecls
+    import io
+    
+    doc = Document()
+    
+    for section in doc.sections:
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+        
+    style = doc.styles['Normal']
+    style.font.name = 'Arial'
+    style.font.size = Pt(11)
+    
+    title = doc.add_heading("投标自查诊断报告", level=1)
+    for run in title.runs:
+        run.font.name = 'Arial'
+        run.font.color.rgb = RGBColor(0x11, 0x18, 0x27)
+        run.font.bold = True
+        
+    p_meta = doc.add_paragraph()
+    p_meta.add_run(f"报告生成时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n").font.size = Pt(9.5)
+    p_meta.add_run(f"对照排查单位: {competitor}").font.size = Pt(9.5)
+    p_meta.runs[0].font.color.rgb = RGBColor(0x6B, 0x72, 0x80)
+    p_meta.runs[1].font.color.rgb = RGBColor(0x6B, 0x72, 0x80)
+    
+    h_sum = doc.add_heading("1. 风险评估摘要", level=2)
+    for run in h_sum.runs:
+        run.font.color.rgb = RGBColor(0x37, 0x41, 0x51)
+        
+    doc.add_paragraph(data.get("summary", ""))
+    
+    h_det = doc.add_heading("2. 详细排查点列表", level=2)
+    for run in h_det.runs:
+        run.font.color.rgb = RGBColor(0x37, 0x41, 0x51)
+        
+    issues = data.get("issues", [])
+    if not issues:
+        doc.add_paragraph("未检测到明显的串标雷同项。")
+    else:
+        table_data = [["序号", "陪标单位", "陪标页码", "主标页码", "嫌疑率", "问题描述"]]
+        for idx, iss in enumerate(issues, 1):
+            rate_str = f"{iss.get('rate', 0) * 100:.1f}%"
+            desc = re.sub(r'\*\*(.*?)\*\*', r'\1', iss.get('description', ''))
+            table_data.append([
+                str(idx),
+                competitor,
+                str(iss.get('sec_page', '')),
+                str(iss.get('pri_page', '')),
+                rate_str,
+                desc
+            ])
+            
+        rows = len(table_data)
+        cols = 6
+        table = doc.add_table(rows=rows, cols=cols)
+        
+        tblPr = table._tbl.tblPr
+        borders = parse_xml(
+            f'<w:tblBorders {nsdecls("w")}>'
+            f'  <w:top w:val="single" w:sz="4" w:space="0" w:color="CCCCCC"/>'
+            f'  <w:bottom w:val="single" w:sz="4" w:space="0" w:color="CCCCCC"/>'
+            f'  <w:insideH w:val="single" w:sz="4" w:space="0" w:color="EAEAEA"/>'
+            f'  <w:left w:val="none"/>'
+            f'  <w:right w:val="none"/>'
+            f'  <w:insideV w:val="none"/>'
+            f'</w:tblBorders>'
+        )
+        tblPr.append(borders)
+        
+        col_widths = [Inches(0.5), Inches(1.0), Inches(0.8), Inches(0.8), Inches(1.0), Inches(2.4)]
+        for r_idx, row_data in enumerate(table_data):
+            row = table.rows[r_idx]
+            for c_idx, cell_value in enumerate(row_data):
+                cell = row.cells[c_idx]
+                cell.width = col_widths[c_idx]
+                p = cell.paragraphs[0]
+                run = p.add_run(cell_value)
+                run.font.name = 'Arial'
+                run.font.size = Pt(9.5)
+                
+                if r_idx == 0:
+                    run.font.bold = True
+                    tcPr = cell._tc.get_or_add_tcPr()
+                    shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="F2F2F2"/>')
+                    tcPr.append(shd)
+                elif r_idx % 2 == 1:
+                    tcPr = cell._tc.get_or_add_tcPr()
+                    shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="FAFAFA"/>')
+                    tcPr.append(shd)
+                    
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+def generate_html_report(competitor, data):
+    import html
+    rows_html = ""
+    issues = data.get("issues", [])
+    if not issues:
+        rows_html = '<tr><td colspan="6" style="text-align: center; color: #6b7280;">未检测到明显的串标雷同项。</td></tr>'
+    else:
+        for idx, iss in enumerate(issues, 1):
+            rate = iss.get('rate', 0)
+            rate_str = f"{rate * 100:.1f}%"
+            if rate >= 0.8:
+                badge = f'<span class="badge badge-high">{rate_str}</span>'
+            elif rate >= 0.3:
+                badge = f'<span class="badge badge-medium">{rate_str}</span>'
+            else:
+                badge = f'<span class="badge badge-low">{rate_str}</span>'
+                
+            desc = html.escape(iss.get('description', ''))
+            desc = desc.replace("**", "<b>").replace("**", "</b>")
+            
+            rows_html += f"""
+            <tr>
+                <td>{idx}</td>
+                <td>{html.escape(competitor)}</td>
+                <td>{html.escape(iss.get('sec_page', ''))}</td>
+                <td>{html.escape(iss.get('pri_page', ''))}</td>
+                <td>{badge}</td>
+                <td>{desc}</td>
+            </tr>
+            """
+            
+    time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    summary_escaped = html.escape(data.get("summary", "")).replace("\n", "<br/>")
+    
+    html_template = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>标书自查诊断报告 - {html.escape(competitor)}</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #1f2937;
+            background-color: #f9fafb;
+            margin: 0;
+            padding: 40px 20px;
+        }}
+        .container {{
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e5e7eb;
+        }}
+        h1 {{
+            color: #111827;
+            margin-top: 0;
+            font-size: 28px;
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 12px;
+        }}
+        .meta {{
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }}
+        h2 {{
+            color: #374151;
+            font-size: 20px;
+            margin-top: 30px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 8px;
+        }}
+        .summary-card {{
+            background-color: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 30px;
+            font-size: 15px;
+            line-height: 1.6;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }}
+        th, td {{
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+        }}
+        th {{
+            background-color: #f3f4f6;
+            font-weight: 600;
+            color: #374151;
+        }}
+        tr:nth-child(even) td {{
+            background-color: #fafafa;
+        }}
+        .badge {{
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 500;
+        }}
+        .badge-high {{ background-color: #fee2e2; color: #991b1b; }}
+        .badge-medium {{ background-color: #fef3c7; color: #92400e; }}
+        .badge-low {{ background-color: #d1fae5; color: #065f46; }}
+        
+        @media print {{
+            body {{ background-color: white; padding: 0; }}
+            .container {{ box-shadow: none; border: none; padding: 0; }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>投标自查诊断报告</h1>
+        <div class="meta">
+            <div><strong>生成时间:</strong> {time_str}</div>
+            <div><strong>对照单位:</strong> {html.escape(competitor)}</div>
+        </div>
+        
+        <h2>1. 风险评估摘要</h2>
+        <div class="summary-card">
+            {summary_escaped}
+        </div>
+        
+        <h2>2. 详细排查点列表</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 50px;">序号</th>
+                    <th>陪标单位</th>
+                    <th style="width: 80px;">陪标页码</th>
+                    <th style="width: 80px;">主标页码</th>
+                    <th style="width: 80px;">嫌疑率</th>
+                    <th>问题描述</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>"""
+    return html_template
+
 class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith('/api/get_key'):
@@ -284,6 +750,103 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps(history).encode('utf-8'))
+            return
+        elif self.path.startswith('/api/export_report'):
+            query = urllib.parse.urlparse(self.path).query
+            params = urllib.parse.parse_qs(query)
+            fmt = params.get('format', ['word'])[0].lower()
+            competitor = params.get('competitor', [''])[0]
+            
+            global LATEST_COLLUSION_DATA
+            
+            collusion_data = None
+            if competitor and competitor in LATEST_COLLUSION_DATA:
+                collusion_data = LATEST_COLLUSION_DATA
+            elif LATEST_COLLUSION_DATA:
+                collusion_data = LATEST_COLLUSION_DATA
+            elif competitor:
+                history = load_history_db()
+                for record in history:
+                    if record.get('collusionData') and competitor in record['collusionData']:
+                        collusion_data = record['collusionData']
+                        break
+            
+            if not collusion_data:
+                history = load_history_db()
+                if history and history[0].get('collusionData'):
+                    collusion_data = history[0]['collusionData']
+            
+            if not collusion_data:
+                self.send_response(400)
+                self.send_header('Content-type', 'text/html; charset=utf-8')
+                self.end_headers()
+                self.wfile.write("错误: 未找到排查数据，请重新排查后重试。".encode('utf-8'))
+                return
+                
+            import io
+            import zipfile
+            
+            zip_buffer = io.BytesIO()
+            try:
+                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                    for comp_name, comp_data in collusion_data.items():
+                        if fmt == 'word':
+                            file_bytes = generate_docx_report(comp_name, comp_data)
+                            file_name = f"诊断报告_{comp_name}.docx"
+                        elif fmt == 'md':
+                            lines = [
+                                f"# 投标自查诊断报告 - {comp_name}",
+                                "",
+                                f"- **报告生成时间**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                                f"- **对照排查单位**: {comp_name}",
+                                "",
+                                "## 1. 风险评估摘要",
+                                "",
+                                comp_data.get("summary", ""),
+                                "",
+                                "## 2. 详细排查点列表",
+                                "",
+                                "| 序号 | 陪标单位 | 陪标页码 | 主标页码 | 嫌疑疑似率 | 问题描述 |",
+                                "| --- | --- | --- | --- | --- | --- |"
+                            ]
+                            for idx, iss in enumerate(comp_data.get("issues", []), 1):
+                                rate_str = f"{iss.get('rate', 0) * 100:.1f}%"
+                                desc = iss.get('description', '')
+                                lines.append(f"| {idx} | {comp_name} | {iss.get('sec_page', '')} | {iss.get('pri_page', '')} | {rate_str} | {desc} |")
+                            file_bytes = "\n".join(lines).encode('utf-8')
+                            file_name = f"诊断报告_{comp_name}.md"
+                        elif fmt == 'html' or fmt == 'pdf':
+                            html_text = generate_html_report(comp_name, comp_data)
+                            if fmt == 'pdf':
+                                print_script = "<script>window.onload = function() { window.print(); }</script></body>"
+                                html_text = html_text.replace("</body>", print_script)
+                            file_bytes = html_text.encode('utf-8')
+                            file_name = f"诊断报告_{comp_name}.html"
+                        elif fmt == 'csv':
+                            lines = ["\ufeff序号,陪标单位,陪标页码,主标页码,嫌疑率,问题描述"]
+                            for idx, iss in enumerate(comp_data.get("issues", []), 1):
+                                rate_str = f"{iss.get('rate', 0) * 100:.1f}%"
+                                desc_escaped = iss.get('description', '').replace('"', '""')
+                                lines.append(f'{idx},{comp_name},{iss.get("sec_page", "")},{iss.get("pri_page", "")},{rate_str},"{desc_escaped}"')
+                            file_bytes = "\n".join(lines).encode('utf-8')
+                            file_name = f"诊断报告_{comp_name}.csv"
+                        else:
+                            continue
+                        zip_file.writestr(file_name, file_bytes)
+                        
+                zip_bytes = zip_buffer.getvalue()
+                
+                self.send_response(200)
+                filename_escaped = urllib.parse.quote("自查排查诊断报告.zip")
+                self.send_header('Content-type', 'application/zip')
+                self.send_header('Content-Disposition', f"attachment; filename*=UTF-8''{filename_escaped}")
+                self.end_headers()
+                self.wfile.write(zip_bytes)
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'text/html; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(f"打包导出报告失败: {e}".encode('utf-8'))
             return
         return super().do_GET()
 
@@ -543,6 +1106,100 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"success": True}).encode('utf-8'))
             return
+        elif self.path == '/api/analyze':
+            content_type = self.headers.get('Content-Type')
+            if not content_type or not content_type.startswith('multipart/form-data'):
+                self.send_response(400)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": "Invalid content type"}).encode('utf-8'))
+                return
+                
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            
+            boundary = ""
+            for param in content_type.split(';'):
+                param = param.strip()
+                if param.startswith('boundary='):
+                    boundary = param.split('=', 1)[1]
+                    if boundary.startswith('"') and boundary.endswith('"'):
+                        boundary = boundary[1:-1]
+            
+            if not boundary:
+                self.send_response(400)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": "Missing boundary in Content-Type"}).encode('utf-8'))
+                return
+                
+            primary_files, secondary_files = parse_multipart_bytes(body, boundary)
+            
+            if not primary_files or not secondary_files:
+                self.send_response(400)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": "请先上传我方标书及对照标书！"}).encode('utf-8'))
+                return
+                
+            import tempfile
+            import shutil
+            
+            temp_dir = tempfile.mkdtemp(dir=os.path.dirname(os.path.abspath(__file__)))
+            
+            try:
+                primary_paths = []
+                for fname, fbytes in primary_files:
+                    path = os.path.join(temp_dir, "pri_" + fname)
+                    with open(path, 'wb') as f:
+                        f.write(fbytes)
+                    primary_paths.append(path)
+                    
+                secondary_paths = []
+                for fname, fbytes in secondary_files:
+                    path = os.path.join(temp_dir, "sec_" + fname)
+                    with open(path, 'wb') as f:
+                        f.write(fbytes)
+                    competitor_name = simplify_bidder_name(os.path.splitext(fname)[0])
+                    secondary_paths.append((competitor_name, path))
+                    
+                collusion_data = {}
+                pri_path = primary_paths[0]
+                
+                for competitor_name, sec_path in secondary_paths:
+                    issues = check_collusion_compare_wrapper(pri_path, sec_path)
+                    
+                    max_rate = max([iss["rate"] for iss in issues]) if issues else 0
+                    if max_rate >= 0.8:
+                        summary = f"共检测到 {len(issues)} 个排查点，存在严重的定制文本大面积雷同及配图一致，具有极高的围标串标嫌疑。"
+                    elif max_rate >= 0.3:
+                        summary = f"共检测到 {len(issues)} 个排查点，存在部分雷同内容，具有中等围标串标嫌疑。"
+                    else:
+                        summary = f"共检测到 {len(issues)} 个排查点，主要是模板指导词或合理雷同，风险较低。"
+                        
+                    collusion_data[competitor_name] = {
+                        "summary": summary,
+                        "issues": issues
+                    }
+                global LATEST_COLLUSION_DATA
+                LATEST_COLLUSION_DATA = collusion_data
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, "collusionData": collusion_data}).encode('utf-8'))
+                
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode('utf-8'))
+            finally:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            return
+
 
     def load_key(self, env_key):
         if not env_key:

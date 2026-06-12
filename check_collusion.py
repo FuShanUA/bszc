@@ -129,7 +129,15 @@ def extract_images_from_pdf(pdf_path):
                 # pypdf page.images collection
                 for img_idx, img_obj in enumerate(page.images):
                     try:
-                        img_data = img_obj.data
+                        try:
+                            img_data = img_obj.data
+                        except Exception:
+                            try:
+                                img_data = img_obj._data
+                            except Exception:
+                                continue
+                        if not img_data:
+                            continue
                         md5_hash = hashlib.md5(img_data).hexdigest()
                         image_hashes[md5_hash].append((page_num, img_obj.name))
                     except Exception:

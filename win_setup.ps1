@@ -1,4 +1,4 @@
-﻿# Set UTF-8 encoding to prevent mojibake on Chinese Windows
+# Set UTF-8 encoding to prevent mojibake on Chinese Windows
 $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 if ([Console]::InputEncoding.CodePage -ne 65001) {
     try {
@@ -9,7 +9,7 @@ if ([Console]::InputEncoding.CodePage -ne 65001) {
 function Clear-Console {
     Clear-Host
     Write-Host "==============================================" -ForegroundColor Green
-    Write-Host "      投标自查卫士 BidShield Windows 助手      " -ForegroundColor Green
+    Write-Host "      BidShield Windows Helper      " -ForegroundColor Green
     Write-Host "==============================================" -ForegroundColor Green
 }
 
@@ -30,17 +30,17 @@ function Stop-BidShieldServer {
         $killed = $false
         foreach ($p in $gps) {
             if ($p.CommandLine -match "server.py") {
-                Write-Host "🛑 正在停止已运行的 投标自查卫士 服务端 (PID: $($p.ProcessId))... " -ForegroundColor Yellow
+                Write-Host "🛑 正在停止已运行的 BidShield 服务端 (PID: $($p.ProcessId))... " -ForegroundColor Yellow
                 Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
                 $killed = $true
             }
         }
         
         # Also kill any running compiled executables of BidShield
-        $exeProcesses = Get-Process -Name "bszc", "投标自查卫士" -ErrorAction SilentlyContinue
+        $exeProcesses = Get-Process -Name "bszc", "投标自查卫士", "BidShield" -ErrorAction SilentlyContinue
         if ($exeProcesses) {
             foreach ($ep in $exeProcesses) {
-                Write-Host "🛑 正在停止已运行的 投标自查卫士 可执行程序 (PID: $($ep.Id))... " -ForegroundColor Yellow
+                Write-Host "🛑 正在停止已运行的 BidShield 可执行程序 (PID: $($ep.Id))... " -ForegroundColor Yellow
                 Stop-Process -Id $ep.Id -Force -ErrorAction SilentlyContinue
                 $killed = $true
             }
@@ -172,8 +172,8 @@ if ($needInstall) {
 # Menu loop
 while ($true) {
     Clear-Console
-    Write-Host "  [1] 启动 投标自查卫士 (本地运行) " -ForegroundColor White
-    Write-Host "  [2] 打包 投标自查卫士 (生成独立的 .exe 文件) " -ForegroundColor White
+    Write-Host "  [1] 启动 BidShield (本地运行) " -ForegroundColor White
+    Write-Host "  [2] 打包 BidShield (生成独立的 .exe 文件) " -ForegroundColor White
     Write-Host "  [3] 重新安装/更新所有依赖包 " -ForegroundColor White
     Write-Host "  [4] 清理临时打包文件 (build/dist/spec) " -ForegroundColor White
     Write-Host "  [5] 退出 " -ForegroundColor White
@@ -185,7 +185,7 @@ while ($true) {
         "1" {
             Clear-Console
             Stop-BidShieldServer
-            Write-Host "🚀 正在后台启动 投标自查卫士 服务端，并自动打开浏览器... " -ForegroundColor Green
+            Write-Host "🚀 正在后台启动 BidShield 服务端，并自动打开浏览器... " -ForegroundColor Green
             
             # Start process hidden (which automatically opens the browser via webbrowser.open)
             Start-Process -FilePath $PythonCmd -ArgumentList "server.py" -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
@@ -205,7 +205,7 @@ while ($true) {
             # Execute PyInstaller via python module runner for maximum stability
             $argsList = @(
                 "-m", "PyInstaller",
-                "--name=bszc",
+                "--name=BidShield",
                 "--add-data=index.html;.",
                 "--add-data=logo.png;."
             )
@@ -222,9 +222,9 @@ while ($true) {
             
             & $PythonCmd $argsList
             
-            if ($LASTEXITCODE -eq 0 -and (Test-Path (Join-Path $PSScriptRoot "dist\bszc.exe"))) {
+            if ($LASTEXITCODE -eq 0 -and (Test-Path (Join-Path $PSScriptRoot "dist\BidShield.exe"))) {
                 Write-Host "`n✔ 打包成功！独立可执行文件已生成在： " -ForegroundColor Green
-                Write-Host "👉 $(Join-Path $PSScriptRoot 'dist\bszc.exe') " -ForegroundColor Green
+                Write-Host "👉 $(Join-Path $PSScriptRoot 'dist\BidShield.exe') " -ForegroundColor Green
                 Write-Host "`n✨ 您可以将该文件发送给其他 Windows 用户，双击即可无依赖运行！ " -ForegroundColor Green
             } else {
                 Write-Host "`n❌ 打包失败，请检查上方 PyInstaller 报错信息。 " -ForegroundColor Red
@@ -246,7 +246,7 @@ while ($true) {
             
             $buildDir = Join-Path $PSScriptRoot "build"
             $distDir = Join-Path $PSScriptRoot "dist"
-            $specFile = Join-Path $PSScriptRoot "bszc.spec"
+            $specFile = Join-Path $PSScriptRoot "BidShield.spec"
             
             if (Test-Path $buildDir) {
                 Remove-Item -Recurse -Force $buildDir
@@ -258,7 +258,7 @@ while ($true) {
             }
             if (Test-Path $specFile) {
                 Remove-Item -Force $specFile
-                Write-Host "✔ 已清理 bszc.spec 文件 " -ForegroundColor Green
+                Write-Host "✔ 已清理 BidShield.spec 文件 " -ForegroundColor Green
             }
             
             Write-Host "`n✔ 临时文件清理完毕！ " -ForegroundColor Green

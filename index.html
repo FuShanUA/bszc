@@ -1644,8 +1644,15 @@
     <div class="results-section" id="results-area">
         <div class="section-title-bar">
             <div class="section-title">📊 第 2 步：自查排查诊断报告</div>
-            <div class="btn-export-row">
-                <button class="btn-export" onclick="exportDocxReport()">📄 导出 Word 诊断报告</button>
+            <div class="btn-export-row" style="display: flex; gap: 8px; align-items: center;">
+                <select id="export-format-select" class="input-text" style="padding: 4px 8px; width: 110px; height: 32px; font-size: 13px; border-radius: 6px; border: 1px solid var(--border-color); background-color: white; color: var(--text-main); font-weight: 500;">
+                    <option value="word">Word (.docx)</option>
+                    <option value="md">Markdown (.md)</option>
+                    <option value="html">HTML (.html)</option>
+                    <option value="csv">CSV (.csv)</option>
+                    <option value="pdf">PDF (.pdf)</option>
+                </select>
+                <button class="btn-export" onclick="exportReport()" style="height: 32px; padding: 0 12px; margin: 0; font-size: 13px; border-radius: 6px; display: flex; align-items: center; gap: 4px;">📄 导出报告</button>
             </div>
         </div>
 
@@ -1730,6 +1737,8 @@
     <script>
         // Pre-computed collusion check data (loaded dynamically if demo_data.json exists)
         let collusionData = {};
+        let selectedPrimaryFiles = [];
+        let selectedSecondaryFiles = [];
 
         let currentCompetitor = "华路";
         let currentFilterType = "ALL";
@@ -1889,6 +1898,13 @@
                 const fileId = `file-${type}-${Date.now()}-${i}`;
                 const sizeStr = formatBytes(file.size);
                 
+                // Store file object in global array
+                if (type === 'primary') {
+                    selectedPrimaryFiles.push({ id: fileId, file: file });
+                } else {
+                    selectedSecondaryFiles.push({ id: fileId, file: file });
+                }
+                
                 const item = document.createElement("div");
                 item.className = "file-item";
                 item.id = fileId;
@@ -1934,8 +1950,10 @@
             if (item) {
                 item.remove();
                 if (type === 'primary') {
+                    selectedPrimaryFiles = selectedPrimaryFiles.filter(f => f.id !== fileId);
                     primaryFileCount = Math.max(0, primaryFileCount - 1);
                 } else {
+                    selectedSecondaryFiles = selectedSecondaryFiles.filter(f => f.id !== fileId);
                     secondaryFileCount = Math.max(0, secondaryFileCount - 1);
                 }
                 updateFileCounts();
@@ -1967,10 +1985,74 @@
             
             results.style.display = "none";
             loading.style.display = "flex";
+            
+            let apiData = null;
+            let animationDone = false;
+            
+            const statuses = currentMode === 'file' ? [
+                "正在加载文档解析引擎...",
+                "正在提取 主标书 PDF 元数据及文本...",
+                "正在多路提取 对照标书 元数据及文本...",
+                "正在进行全局文档属性与时间指纹比对...",
+                "正在比对所有嵌入式配图与图表资产哈希...",
+                "正在建立中文分词滑动索引...",
+                "正在进行双向详细比对...",
+                "已自动识别过滤通用招标文件模板并进行降权...",
+                "正在渲染比对报告..."
+            ] : [
+                "正在解析剪贴板复制文本...",
+                "正在读取文本字段...",
+                "正在提取我方与对手方公司简称...",
+                "正在对复制文本进行相似度哈希比对...",
+                "正在进行敏感词及交叉混淆漏改排查...",
+                "正在渲染比对报告..."
+            ];
+            
+            let idx = 0;
+            const interval = setInterval(() => {
+                if (idx < statuses.length) {
+                    document.getElementById("loading-status").innerText = statuses[idx];
+                    idx++;
+                } else {
+                    animationDone = true;
+                    checkFinish();
+                }
+            }, 300);
 
-            if (!isHistoryRecall) {
+            function checkFinish() {
+                if (animationDone && (isHistoryRecall || apiData)) {
+                    clearInterval(interval);
+                    loading.style.display = "none";
+                    results.style.display = "block";
+                    
+                    if (!isHistoryRecall) {
+                        collusionData = apiData;
+                        saveHistoryWithData();
+                    }
+                    
+                    if (currentMode === 'text') {
+                        const priCompany = getPrimaryCompany();
+                        const secCompany = getSecondaryCompany();
+                        
+                        renderCompetitorCards();
+                        
+                        const keys = Object.keys(collusionData);
+                        selectCompetitor(keys.includes(secCompany) ? secCompany : keys[0] || '华路');
+                    } else {
+                        const keys = Object.keys(collusionData);
+                        if (keys.length > 0 && !keys.includes(currentCompetitor)) {
+                            currentCompetitor = keys[0];
+                        }
+                        renderCompetitorCards();
+                        selectCompetitor(currentCompetitor);
+                    }
+                }
+            }
+
+            function saveHistoryWithData() {
                 const record = {
-                    mode: currentMode
+                    mode: currentMode,
+                    collusionData: collusionData
                 };
                 if (currentMode === 'file') {
                     const priFiles = Array.from(document.querySelectorAll("#primary-file-list-container .file-item-name")).map(el => el.innerText);
@@ -1994,88 +2076,117 @@
                 })
                 .catch(err => console.error("保存历史记录失败:", err));
             }
-            
-            const statuses = currentMode === 'file' ? [
-                "正在加载文档解析引擎...",
-                "正在提取 主标书[数据易] PDF 元数据及文本...",
-                "正在多路提取 华路、至臻云、卓维 标书元数据及文本...",
-                "正在进行全局文档属性与时间指纹比对...",
-                "正在比对所有嵌入式配图与图表资产哈希...",
-                "正在按 15-gram 建立中文分词滑动索引...",
-                "正在对 604 个潜在重合段落进行双向详细比对...",
-                "已自动识别过滤国家电力招标文件模板 boilerplate 条款并进行降权...",
-                "正在渲染比对报告..."
-            ] : [
-                "正在解析剪贴板复制文本...",
-                "正在读取文本字段...",
-                "正在提取我方与对手方公司简称...",
-                "正在对复制文本进行相似度哈希比对...",
-                "正在进行敏感词及交叉混淆漏改排查...",
-                "正在渲染比对报告..."
-            ];
-            
-            let idx = 0;
-            const interval = setInterval(() => {
-                if (idx < statuses.length) {
-                    document.getElementById("loading-status").innerText = statuses[idx];
-                    idx++;
-                } else {
+
+            if (isHistoryRecall) {
+                apiData = collusionData;
+            } else if (currentMode === 'file') {
+                const formData = new FormData();
+                selectedPrimaryFiles.forEach(f => {
+                    formData.append('primary_files', f.file);
+                });
+                selectedSecondaryFiles.forEach(f => {
+                    formData.append('secondary_files', f.file);
+                });
+                
+                fetch('/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        apiData = data.collusionData;
+                        checkFinish();
+                    } else {
+                        alert("分析失败: " + data.error);
+                        clearInterval(interval);
+                        loading.style.display = "none";
+                    }
+                })
+                .catch(err => {
+                    alert("分析发生错误: " + err);
                     clearInterval(interval);
                     loading.style.display = "none";
-                    results.style.display = "block";
-                    
-                    if (currentMode === 'text') {
-                        const priCompany = getPrimaryCompany();
-                        const secCompany = getSecondaryCompany();
-                        
-                        document.getElementById("card-hualu").style.display = "flex";
-                        document.getElementById("card-hualu").querySelector(".risk-company").innerText = `${secCompany} (${secCompany}建筑咨询)`;
-                        document.getElementById("card-hualu").querySelector(".risk-meta").innerText = `共检测到 10 个与 [${priCompany}] 的重合排查点`;
-                        
-                        document.getElementById("card-zhizhen").style.display = "none";
-                        document.getElementById("card-zhuowei").style.display = "none";
-                        
-                        selectCompetitor('华路');
-                    } else {
-                        document.getElementById("card-hualu").style.display = "flex";
-                        document.getElementById("card-hualu").querySelector(".risk-company").innerText = "华路 (北京华路时代)";
-                        document.getElementById("card-hualu").querySelector(".risk-meta").innerText = "共检测到 10 个高危排查点";
-                        
-                        document.getElementById("card-zhizhen").style.display = "flex";
-                        document.getElementById("card-zhuowei").style.display = "flex";
-                        
-                        selectCompetitor(currentCompetitor);
-                    }
+                });
+            } else {
+                apiData = collusionData;
+                checkFinish();
+            }
+        }
+
+        // Render risk competitor summary cards dynamically based on collusionData keys
+        function renderCompetitorCards() {
+            const container = document.querySelector(".dashboard-row");
+            if (!container) return;
+            
+            container.innerHTML = "";
+            const keys = Object.keys(collusionData);
+            
+            if (keys.length === 0) {
+                container.innerHTML = `<div style="text-align: center; color: var(--text-muted); width: 100%; padding: 20px;">暂无排查数据</div>`;
+                return;
+            }
+            
+            keys.forEach((name, index) => {
+                const data = collusionData[name];
+                const issues = data.issues || [];
+                
+                let maxRate = 0;
+                issues.forEach(iss => {
+                    if (iss.rate > maxRate) maxRate = iss.rate;
+                });
+                
+                let riskBadgeClass = "risk-badge-low";
+                let riskLevel = "低危风险";
+                if (maxRate >= 0.8) {
+                    riskBadgeClass = "risk-badge-high";
+                    riskLevel = "高危风险";
+                } else if (maxRate >= 0.3) {
+                    riskBadgeClass = "risk-badge-medium";
+                    riskLevel = "中危风险";
                 }
-            }, 300);
+                
+                const card = document.createElement("div");
+                card.className = "risk-card" + (name === currentCompetitor ? " active" : "");
+                card.onclick = () => selectCompetitor(name);
+                
+                card.innerHTML = `
+                    <div class="risk-left">
+                        <span class="risk-company">${name}</span>
+                        <span class="risk-meta">共检测到 ${issues.length} 个排查点</span>
+                    </div>
+                    <span class="risk-badge ${riskBadgeClass}">${riskLevel} ${(maxRate * 100).toFixed(1)}%</span>
+                `;
+                container.appendChild(card);
+            });
         }
 
         // Choose bidder tabs
         function selectCompetitor(name) {
             currentCompetitor = name;
             
-            const defaults = ["华路", "至臻云", "卓维"];
-            if (!defaults.includes(name)) {
-                if (!collusionData[name]) {
-                    collusionData[name] = JSON.parse(JSON.stringify(collusionData["华路"]));
-                    collusionData[name].summary = collusionData[name].summary.replace(/华路/g, name);
+            if (!collusionData[name]) {
+                const keys = Object.keys(collusionData);
+                if (keys.length > 0) {
+                    collusionData[name] = JSON.parse(JSON.stringify(collusionData[keys[0]]));
+                    collusionData[name].issues = [];
+                    collusionData[name].summary = "无可疑内容";
+                } else {
+                    collusionData[name] = { summary: "暂无排查点", issues: [] };
                 }
             }
             
-            document.querySelectorAll(".risk-card").forEach(card => card.classList.remove("active"));
+            // Highlight the active card
+            document.querySelectorAll(".risk-card").forEach(card => {
+                const compName = card.querySelector(".risk-company").innerText.split(' (')[0].trim();
+                if (compName === name.trim()) {
+                    card.classList.add("active");
+                } else {
+                    card.classList.remove("active");
+                }
+            });
+            
             document.querySelectorAll(".file-item").forEach(item => item.classList.remove("active"));
-            
-            let cardEl = null;
-            if (name === "华路" || !defaults.includes(name)) {
-                cardEl = document.getElementById("card-hualu");
-                cardEl.querySelector(".risk-company").innerText = name + (name === "华路" ? " (北京华路时代)" : " (自定义对照方)");
-            } else if (name === "至臻云") {
-                cardEl = document.getElementById("card-zhizhen");
-            } else if (name === "卓维") {
-                cardEl = document.getElementById("card-zhuowei");
-            }
-            
-            if (cardEl) cardEl.classList.add("active");
             
             document.querySelectorAll("#secondary-file-list-container .file-item").forEach(item => {
                 if (item.innerText.includes(name)) {
@@ -2268,9 +2379,24 @@
         }
 
         // Export Report action
-        function exportDocxReport() {
-            alert("正在生成并导出 Word 格式自查诊断报告到下载目录...");
-            window.location.href = "file:///Users/shanfu/Downloads/串标分析.docx";
+        function exportReport() {
+            const select = document.getElementById("export-format-select");
+            if (!select) return;
+            const format = select.value;
+            
+            if (!currentCompetitor) {
+                alert("无有效的分析数据，请先进行排查！");
+                return;
+            }
+            
+            const url = `/api/export_report?format=${format}&competitor=${encodeURIComponent(currentCompetitor)}`;
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = '';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         // --- API Key Modal Logic ---
@@ -2447,6 +2573,10 @@
         function restoreHistoryRecord(record) {
             currentMode = record.mode;
             switchMode(record.mode);
+            
+            if (record.collusionData) {
+                collusionData = record.collusionData;
+            }
             
             if (record.mode === 'file') {
                 const priContainer = document.getElementById("primary-file-list-container");
